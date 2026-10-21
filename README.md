@@ -17,7 +17,7 @@ account, no uploads.
 
 - **Python 3.11 or newer** (3.12 or 3.13 recommended) from <https://www.python.org/downloads/>. On Windows, tick
   *"Add python.exe to PATH"* in the installer.
-- **Ollama** from <https://ollama.com/download>. Install it and leave it running (on Windows and
+- **Ollama 0.9 or newer** from <https://ollama.com/download>. Install it and leave it running (on Windows and
   macOS it sits in the system tray / menu bar).
 
 ### 2. Setup (once)
@@ -134,7 +134,7 @@ delimited untrusted data.
 |---|---|---|
 | `CAMPUSMAIL_MODEL` | `qwen3:4b` | Ollama model tag (e.g. `qwen3:1.7b` on a slow laptop) |
 | `OLLAMA_HOST` | `http://localhost:11434` | where Ollama listens |
-| `CAMPUSMAIL_TIMEOUT` | `120` | seconds to wait for one model answer |
+| `CAMPUSMAIL_TIMEOUT` | `120` | seconds to wait for one model answer (the first answer, which also loads the model, may take up to 300 s) |
 
 You can also type a different model name in the sidebar.
 

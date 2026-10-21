@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import re
 
 from .dates import HKT, parse_iso
 from .llm import LLMClient
@@ -78,9 +79,11 @@ def build_user_prompt(message: Message) -> str:
 
 def validate_output(raw: str) -> Extraction:
     """Parse and type-check the model's answer. Raises InvalidOutput with a short reason."""
-    text = raw.strip()
-    if text.startswith("```"):
-        text = text.strip("`").removeprefix("json").strip()
+    # Small models sometimes wrap the JSON in a reasoning trace or a code fence; keep the object only.
+    text = re.sub(r"<think>.*?</think>", "", raw, flags=re.S).strip()
+    first, last = text.find("{"), text.rfind("}")
+    if first != -1 and last > first:
+        text = text[first:last + 1]
     try:
         data = json.loads(text)
     except json.JSONDecodeError as exc:
