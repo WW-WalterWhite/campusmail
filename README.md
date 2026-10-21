@@ -115,7 +115,7 @@ environment variable before starting the app). The key is kept in memory for the
 | provider | key variable | default model (editable) | structured output |
 |---|---|---|---|
 | OpenAI | `OPENAI_API_KEY` | `gpt-4.1-mini` | JSON schema |
-| Anthropic (Claude) | `ANTHROPIC_API_KEY` | `claude-haiku-5-5` | forced tool call with the schema |
+| Anthropic (Claude) | `ANTHROPIC_API_KEY` | `claude-haiku-5-5` | structured outputs (JSON schema) |
 | DeepSeek | `DEEPSEEK_API_KEY` | `deepseek-chat` | JSON mode |
 | Qwen (Alibaba Cloud Model Studio, international) | `DASHSCOPE_API_KEY` | `qwen-plus` | JSON mode |
 | Other OpenAI-compatible | `CAMPUSMAIL_API_KEY` | you enter model and base URL | JSON mode |

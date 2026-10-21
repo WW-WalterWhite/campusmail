@@ -184,14 +184,20 @@ class OpenAICompatibleClient(_HTTPClient):
         data = self._post(f"{self.base_url}/chat/completions",
                           {"Authorization": f"Bearer {self.api_key}"}, payload)
         try:
-            return data["choices"][0]["message"]["content"]
+            message = data["choices"][0]["message"]
         except (KeyError, IndexError, TypeError) as exc:
             raise LLMUnavailable(f"{self.provider} returned an unexpected response.") from exc
+        # content is null when the model refuses; validation then sends that one message to review.
+        return message.get("content") or "" if isinstance(message, dict) else ""
 
 
 class AnthropicClient(_HTTPClient):
-    """Claude via the Anthropic Messages API. Structured output comes from a forced tool call
-    whose input schema is the extraction schema."""
+    """Claude via the Anthropic Messages API, with structured outputs (output_config.format) so the
+    answer is JSON that matches the extraction schema.
+
+    No temperature is sent (current Claude models reject a non-default one) and thinking is left
+    at the model's default with low effort, which is enough for one short email.
+    """
 
     provider = "Anthropic"
     URL = "https://api.anthropic.com/v1/messages"
@@ -199,18 +205,21 @@ class AnthropicClient(_HTTPClient):
     def complete(self, system: str, user: str, schema: dict) -> str:
         payload = {
             "model": self.model,
-            "max_tokens": 1024,
+            "max_tokens": 16000,
             "system": system,
             "messages": [{"role": "user", "content": user}],
-            "tools": [{"name": "record_extraction", "description": "Record the extracted fields.", "input_schema": schema}],
-            "tool_choice": {"type": "tool", "name": "record_extraction"},
+            "output_config": {
+                "effort": "low",
+                "format": {"type": "json_schema", "schema": {**schema, "additionalProperties": False}},
+            },
         }
         headers = {"x-api-key": self.api_key, "anthropic-version": "2023-06-01"}
         data = self._post(self.URL, headers, payload)
-        for block in data.get("content", []):
-            if block.get("type") == "tool_use":
-                return json.dumps(block.get("input", {}))
-        raise LLMUnavailable("Anthropic returned no structured answer.")
+        if not isinstance(data, dict) or not isinstance(data.get("content"), list):
+            raise LLMUnavailable("Anthropic returned an unexpected response.")
+        # A refusal or a cut-off answer is a problem with this one email, not with the service:
+        # return what there is and let validation send the message to review.
+        return "".join(b.get("text", "") for b in data["content"] if isinstance(b, dict) and b.get("type") == "text")
 
 
 # Presets shown in the app. Model names change often: they are only defaults and can be edited

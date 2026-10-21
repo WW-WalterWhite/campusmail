@@ -11,9 +11,10 @@ Setup (an app registration with Microsoft and/or Google) is described in the REA
 from __future__ import annotations
 
 import base64
-import html
 import os
 import re
+import time
+from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timedelta, timezone
 from html.parser import HTMLParser
 from pathlib import Path
@@ -66,9 +67,12 @@ class _TextExtractor(HTMLParser):
 
 
 def html_to_text(markup: str) -> str:
+    # HTMLParser already decodes entities (convert_charrefs); decoding again would turn a
+    # literal "&amp;lt;" in the email into "<".
     parser = _TextExtractor()
     parser.feed(markup)
-    return html.unescape("".join(parser.parts))
+    parser.close()
+    return "".join(parser.parts)
 
 
 # Start of an earlier message quoted below a reply.
@@ -78,27 +82,38 @@ QUOTE_START = re.compile(
 )
 
 
-def clean_body(text: str) -> tuple[str, bool]:
+FORWARD_SUBJECT = re.compile(r"^\s*(?:fw|fwd)\s*:", re.I)
+
+
+def clean_body(text: str, forwarded: bool = False) -> tuple[str, bool]:
     """Normalise whitespace and drop quoted earlier messages from a reply.
 
     Returns (body, quoted_history_removed). Only the earlier, quoted messages are removed; the
     new text of the email is kept whole, so the "never truncate" rule still holds for it.
+    A forwarded email is kept whole: the forwarded part is usually the announcement itself.
     """
     text = text.replace("\r\n", "\n").replace("\xa0", " ")
     removed = False
-    m = QUOTE_START.search(text)
+    m = None if forwarded else QUOTE_START.search(text)
     if m and m.start() > 0:
         text, removed = text[:m.start()], True
     lines = [line.rstrip() for line in text.split("\n")]
-    if any(line.startswith(">") for line in lines):
-        lines, removed = [line for line in lines if not line.startswith(">")], True
+    if not forwarded:
+        # Only a quoted block at the very end is history. ">" lines between new paragraphs are an
+        # inline reply and are kept, so the answer still makes sense.
+        end = len(lines)
+        while end and (lines[end - 1].startswith(">") or not lines[end - 1].strip()):
+            end -= 1
+        if any(line.startswith(">") for line in lines[end:]) and end:
+            lines, removed = lines[:end], True
     text = re.sub(r"\n{3,}", "\n\n", "\n".join(lines)).strip()
     return text, removed
 
 
 def _message(short_id: str, received: str, subject: str, raw_body: str, is_html: bool,
              thread_id: str | None, link: str | None) -> Message:
-    body, removed = clean_body(html_to_text(raw_body) if is_html else raw_body)
+    body, removed = clean_body(html_to_text(raw_body) if is_html else raw_body,
+                               forwarded=bool(FORWARD_SUBJECT.match(subject)))
     problems = content_problems(subject, body)
     try:
         when = parse_received(received)
@@ -148,7 +163,12 @@ def outlook_start_sign_in(client_id: str = "", authority: str = MS_AUTHORITY):
 
 
 def outlook_finish_sign_in(app, flow) -> str:
-    """Wait until the user has entered the code in the browser; returns an access token."""
+    """Wait until the user has entered the code in the browser; returns an access token.
+
+    Called after the user says they entered the code, so wait at most 90 seconds instead of the
+    code's full 15-minute life, which would freeze the page.
+    """
+    flow["expires_at"] = min(flow.get("expires_at", float("inf")), time.time() + 90)
     result = app.acquire_token_by_device_flow(flow)
     if "access_token" not in result:
         raise MailboxError(f"Microsoft sign-in failed: {result.get('error_description', result.get('error'))}")
@@ -215,9 +235,16 @@ def gmail_fetch(token: str, limit: int = MAX_MESSAGES, days: int = 14, session=N
     session = session or requests.Session()
     listing = _get(session, f"{GMAIL}/messages", token,
                    params={"maxResults": str(min(limit, MAX_MESSAGES)), "q": f"in:inbox newer_than:{days}d"})
+    refs = listing.get("messages", [])[:limit]
+
+    def fetch_one(ref: dict) -> dict:
+        return _get(session, f"{GMAIL}/messages/{ref['id']}", token, params={"format": "full"})
+
+    # One request per message; a few at a time cuts a 30-message import from ~15 s to a few seconds.
+    with ThreadPoolExecutor(max_workers=6) as pool:
+        items = list(pool.map(fetch_one, refs))
     messages = []
-    for i, ref in enumerate(listing.get("messages", [])[:limit], start=1):
-        item = _get(session, f"{GMAIL}/messages/{ref['id']}", token, params={"format": "full"})
+    for i, (ref, item) in enumerate(zip(refs, items), start=1):
         payload = item.get("payload", {})
         headers = {h["name"].lower(): h["value"] for h in payload.get("headers", [])}
         received = datetime.fromtimestamp(int(item.get("internalDate", "0")) / 1000, timezone.utc).isoformat()
