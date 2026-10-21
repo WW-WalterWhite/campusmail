@@ -10,11 +10,11 @@ from pathlib import Path
 
 import streamlit as st
 
-from campusmail import pipeline
+from campusmail import mailbox, pipeline
 from campusmail.dates import HKT, format_dt
 from campusmail.digest import DISCLAIMER, render_text
 from campusmail.importer import CSVImportError, load_csv, parse_course_list, parse_received
-from campusmail.llm import DEFAULT_MODEL, OllamaClient
+from campusmail.llm import CLOUD_PROVIDERS, DEFAULT_MODEL, LLMUnavailable, OllamaClient, cloud_client, key_from_env
 from campusmail.models import Priority
 from campusmail.priority import apply_correction
 
@@ -22,6 +22,7 @@ DATA = Path(__file__).parent / "data"
 SAMPLE_INBOX = DATA / "sample_inbox.csv"
 SAMPLE_PROFILE = json.loads((DATA / "sample_profile.json").read_text(encoding="utf-8"))
 ENGINE_AI = "Local AI (Ollama)"
+ENGINE_CLOUD = "Cloud AI (API key)"
 ENGINE_RULES = "Rules only (no AI)"
 BADGE = {Priority.REVIEW: "🟣", Priority.HIGH: "🔴", Priority.MEDIUM: "🟠", Priority.LOW: "⚪"}
 
@@ -40,15 +41,70 @@ def anchor(message_id: str) -> str:
     return "msg-" + re.sub(r"[^a-z0-9]+", "-", message_id.lower())
 
 
-def load_messages(data: bytes, name: str) -> None:
-    try:
-        state.messages = load_csv(data)
-        state.source_name = name
-    except CSVImportError as exc:
-        state.messages = None
-        st.sidebar.error(str(exc))
+def set_messages(messages, name: str, real_mail: bool = False) -> None:
+    state.messages = messages
+    state.source_name = name
+    state.real_mail = real_mail
     state.run = None
     state.corrections = {}
+
+
+def load_messages(data: bytes, name: str) -> None:
+    try:
+        set_messages(load_csv(data), name)
+    except CSVImportError as exc:
+        set_messages(None, None)
+        st.sidebar.error(str(exc))
+
+
+def use_current_time() -> None:
+    current = datetime.now(HKT)
+    state.ref_date, state.ref_time = current.date(), current.time().replace(second=0, microsecond=0)
+
+
+def mailbox_import() -> None:
+    """Read-only sign-in and fetch. The token stays in memory for this session only."""
+    with st.expander("Import from Outlook or Gmail", expanded=bool(state.get("ms_flow"))):
+        service = st.radio("Account", ["Outlook / HKU (Microsoft 365)", "Gmail"], key="mail_service")
+        c1, c2 = st.columns(2)
+        days = c1.number_input("Days back", 1, 60, 14, key="mail_days")
+        limit = c2.number_input("Messages", 1, 30, 30, key="mail_limit")
+        st.caption("Read-only access. CampusMail cannot send, delete or change your mail.")
+        try:
+            if service.startswith("Outlook"):
+                client_id = st.text_input("Microsoft app ID", value=mailbox.MS_CLIENT_ID, key="ms_client_id",
+                                          help="From your app registration; see the README.")
+                if not state.get("ms_flow"):
+                    if st.button("Sign in with Microsoft", width="stretch"):
+                        state.ms_app, state.ms_flow = mailbox.outlook_start_sign_in(client_id)
+                        st.rerun()
+                else:
+                    flow = state.ms_flow
+                    st.info(f"Open {flow['verification_uri']} and enter the code **{flow['user_code']}**, "
+                            "then press the button below.")
+                    if st.button("I have signed in: fetch mail", type="primary", width="stretch"):
+                        with st.spinner("Waiting for Microsoft sign-in…"):
+                            state.mail_token = mailbox.outlook_finish_sign_in(state.ms_app, flow)
+                        state.ms_flow = state.ms_app = None
+                        with st.spinner("Fetching mail…"):
+                            set_messages(mailbox.outlook_fetch(state.mail_token, int(limit), int(days)),
+                                         "your Outlook inbox", real_mail=True)
+                        use_current_time()
+                        st.rerun()
+                    if st.button("Cancel sign-in", width="stretch"):
+                        state.ms_flow = state.ms_app = None
+                        st.rerun()
+            else:
+                if st.button("Sign in with Google", width="stretch"):
+                    with st.spinner("Finish signing in in the browser tab that opened…"):
+                        token = mailbox.gmail_sign_in()
+                    with st.spinner("Fetching mail…"):
+                        set_messages(mailbox.gmail_fetch(token, int(limit), int(days)), "your Gmail inbox", real_mail=True)
+                    use_current_time()
+                    st.rerun()
+        except mailbox.MailboxError as exc:
+            state.ms_flow = state.ms_app = None
+            st.error(str(exc))
 
 
 def use_sample_profile() -> None:
@@ -74,6 +130,7 @@ with st.sidebar:
     )
     if upload is not None and state.source_name != upload.name:
         load_messages(upload.getvalue(), upload.name)
+    mailbox_import()
 
     st.header("2. Your courses")
     if st.button("Use sample course profile", width="stretch"):
@@ -85,19 +142,41 @@ with st.sidebar:
     col_t.time_input("Time", key="ref_time", label_visibility="collapsed", step=300)
 
     st.header("3. Engine")
-    engine = st.radio("Extraction engine", [ENGINE_AI, ENGINE_RULES], label_visibility="collapsed")
+    engine = st.radio("Extraction engine", [ENGINE_AI, ENGINE_CLOUD, ENGINE_RULES], label_visibility="collapsed")
     client = None
+    cloud_blocked = None  # reason the cloud engine cannot run yet
     if engine == ENGINE_AI:
         model = st.text_input("Ollama model", value=DEFAULT_MODEL)
         client = OllamaClient(model=model)
         ready, status = client.status()
         (st.success if ready else st.warning)(status)
+    elif engine == ENGINE_CLOUD:
+        provider = st.selectbox("Provider", list(CLOUD_PROVIDERS))
+        preset = CLOUD_PROVIDERS[provider]
+        model = st.text_input("Model", value=preset["model"], key=f"model-{provider}")
+        base_url = None
+        if preset["kind"] == "openai" and not preset["base_url"]:
+            base_url = st.text_input("Base URL", placeholder="https://…/v1")
+        env_key = key_from_env(provider)
+        typed_key = st.text_input("API key", type="password", key=f"key-{provider}",
+                                  placeholder=f"or set {preset['key_env']}" if not env_key else "using the environment variable",
+                                  help="Kept in memory for this session only; never saved or logged.")
+        st.warning(f"Email text (subject and body) will be sent to **{provider}** for processing. "
+                   "Their data policy applies, and API calls may cost money.")
+        consent = st.checkbox(f"I understand and want to send these emails to {provider}", key=f"consent-{provider}")
+        try:
+            client = cloud_client(provider, typed_key or env_key, model, base_url)
+        except LLMUnavailable as exc:
+            cloud_blocked = str(exc)
+        if not consent:
+            cloud_blocked = cloud_blocked or "Tick the box to confirm that the emails may be sent to the provider."
 
     st.divider()
     if st.button("Clear session", width="stretch", help="Forget the inbox, results and corrections."):
         clear_session()
         st.rerun()
-    st.caption("Everything runs on this computer. Nothing is uploaded or logged.")
+    st.caption("Nothing is saved or logged. With Local AI or Rules, everything stays on this computer; "
+               "with Cloud AI, email text is sent to the chosen provider.")
 
 # ---------------------------------------------------------------- main
 st.title("📬 CampusMail")
@@ -110,10 +189,15 @@ if state.messages is None:
     st.info("Start with **Load sample inbox** in the sidebar, or import your own CSV.")
     st.stop()
 
+if state.get("real_mail"):
+    st.caption("These are real emails from your account. They are held in memory only; "
+               "**Clear session** forgets them and the sign-in.")
 st.write(f"**{len(state.messages)} messages** from {state.source_name}. "
          f"Courses: {', '.join(courses) if courses else 'none entered'}. Reference time: {now:%a %d %b %Y %H:%M}.")
 
-if st.button("Sort and summarize", type="primary"):
+if cloud_blocked:
+    st.info(cloud_blocked)
+if st.button("Sort and summarize", type="primary", disabled=bool(cloud_blocked)):
     bar = st.progress(0.0, text="Starting…")
 
     def progress(i: int, total: int) -> None:
@@ -208,5 +292,10 @@ for m in state.messages:
     st.markdown(f"##### {m.message_id}: {m.subject or '(no subject)'}")
     st.html(f'<span id="{anchor(m.message_id)}"></span>')
     received = m.received.strftime("%a %d %b %Y %H:%M") if m.received else "unknown"
-    with st.expander(f"Received {received}" + (f" · thread {m.thread_id}" if m.thread_id else ""), expanded=False):
+    thread = f" · thread {m.thread_id}" if m.thread_id and len(m.thread_id) <= 12 else ""
+    with st.expander(f"Received {received}{thread}", expanded=False):
+        if m.link:
+            st.markdown(f"[Open in your mailbox]({m.link})")
+        for note in m.notes:
+            st.caption(note)
         st.text(m.body)

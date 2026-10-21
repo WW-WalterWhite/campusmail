@@ -75,12 +75,7 @@ def load_csv(data: str | bytes) -> list[Message]:
 
         subject = row.get("subject", "").strip()
         body = row.get("body", "").strip()
-        if not body:
-            problems.append("Empty message body.")
-        if len(body) > MAX_BODY_CHARS:
-            problems.append(f"Body is {len(body)} characters; the limit is {MAX_BODY_CHARS}. Not processed so nothing is cut off.")
-        if _non_english(subject + body):
-            problems.append("Message does not appear to be in English (only English is supported).")
+        problems += content_problems(subject, body)
 
         messages.append(Message(
             message_id=message_id,
@@ -91,6 +86,18 @@ def load_csv(data: str | bytes) -> list[Message]:
             problems=problems,
         ))
     return messages
+
+
+def content_problems(subject: str, body: str) -> list[str]:
+    """Checks shared by every import route (CSV and mailbox)."""
+    problems = []
+    if not body:
+        problems.append("Empty message body.")
+    if len(body) > MAX_BODY_CHARS:
+        problems.append(f"Body is {len(body)} characters; the limit is {MAX_BODY_CHARS}. Not processed so nothing is cut off.")
+    if _non_english(subject + body):
+        problems.append("Message does not appear to be in English (only English is supported).")
+    return problems
 
 
 def normalise_course(code: str | None) -> str | None:

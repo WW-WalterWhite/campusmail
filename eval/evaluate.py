@@ -4,6 +4,8 @@
     python eval/evaluate.py --engine ollama       # the local model (Ollama must be running)
     python eval/evaluate.py --inbox data/dev.csv --labels data/dev_labels.csv --out results/dev_rules.csv
 
+    python eval/evaluate.py --engine cloud --provider "Anthropic (Claude)"   # key from ANTHROPIC_API_KEY
+
 Labels CSV: message_id, expected_priority (High / Medium / Low / Needs review).
 Metrics follow the project outline: macro-F1 over messages labelled High/Medium/Low,
 High recall (a "Needs review" prediction counts as a miss) and review recall.
@@ -22,7 +24,7 @@ sys.path.insert(0, str(ROOT))
 
 from campusmail import pipeline  # noqa: E402
 from campusmail.importer import load_csv, parse_received  # noqa: E402
-from campusmail.llm import DEFAULT_MODEL, OllamaClient  # noqa: E402
+from campusmail.llm import CLOUD_PROVIDERS, DEFAULT_MODEL, LLMUnavailable, OllamaClient, cloud_client, key_from_env  # noqa: E402
 from campusmail.models import Priority  # noqa: E402
 
 BANDS = [Priority.HIGH.value, Priority.MEDIUM.value, Priority.LOW.value]
@@ -69,8 +71,11 @@ def main() -> None:
     parser.add_argument("--inbox", default=ROOT / "data/sample_inbox.csv", type=Path)
     parser.add_argument("--labels", default=ROOT / "data/sample_labels.csv", type=Path)
     parser.add_argument("--profile", default=ROOT / "data/sample_profile.json", type=Path)
-    parser.add_argument("--engine", choices=["rules", "ollama"], default="rules")
-    parser.add_argument("--model", default=DEFAULT_MODEL)
+    parser.add_argument("--engine", choices=["rules", "ollama", "cloud"], default="rules")
+    parser.add_argument("--model", help=f"model name (default: {DEFAULT_MODEL} for Ollama, the provider preset for cloud)")
+    parser.add_argument("--provider", choices=list(CLOUD_PROVIDERS), default="OpenAI",
+                        help="cloud provider; the API key is read from its environment variable")
+    parser.add_argument("--base-url", help="base URL for 'Other OpenAI-compatible'")
     parser.add_argument("--out", type=Path, help="write per-message raw results to this CSV")
     args = parser.parse_args()
 
@@ -85,10 +90,16 @@ def main() -> None:
 
     client = None
     if args.engine == "ollama":
-        client = OllamaClient(model=args.model)
+        client = OllamaClient(model=args.model or DEFAULT_MODEL)
         ready, status = client.status()
         if not ready:
             raise SystemExit(status)
+    elif args.engine == "cloud":
+        try:
+            client = cloud_client(args.provider, key_from_env(args.provider), args.model, args.base_url)
+        except LLMUnavailable as exc:
+            raise SystemExit(f"{exc} (expected variable: {CLOUD_PROVIDERS[args.provider]['key_env']})")
+        print(f"Sending {args.inbox.name} to {args.provider}.")
     run = pipeline.run(messages, profile["courses"], now, client)
     if run.notice:
         print(f"NOTICE: {run.notice}")

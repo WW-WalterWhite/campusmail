@@ -32,6 +32,8 @@ class Message:
     thread_id: str | None = None
     # Problems found during import. A message with problems is never sent to the model.
     problems: list[str] = field(default_factory=list)
+    link: str | None = None  # the message in Outlook/Gmail on the web, for mailbox imports
+    notes: list[str] = field(default_factory=list)  # import notes that are not problems
 
     @property
     def text(self) -> str:
