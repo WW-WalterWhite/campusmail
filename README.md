@@ -77,6 +77,12 @@ engine the sample matches them exactly (this is a smoke test, not an evaluation 
 sample was written by the developers). Model results may differ; that is what the evaluation
 script measures.
 
+What it looks like (sample inbox, rules-only view):
+
+| Overview | A review item shows the original email | High items explain why |
+|---|---|---|
+| ![Overview](docs/screenshots/overview.png) | ![Review item](docs/screenshots/review_item.png) | ![High items](docs/screenshots/high_items.png) |
+
 ### Without Ollama
 
 Choose **Rules only (no AI)** under Engine. If you pick Local AI and the model cannot be
