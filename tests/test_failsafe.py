@@ -68,3 +68,21 @@ def test_model_failure_never_fabricates_a_summary(failure):
         assert run.notice.startswith("AI unavailable") and r.extraction.source == "rules"
     else:
         assert r.priority is Priority.REVIEW and r.extraction is None
+
+
+GOOD = {
+    "course": None, "category": "general", "action_required": False, "action_text": None,
+    "deadline": None, "deadline_status": "none", "deadline_quote": None,
+    "summary": "An optional talk.", "quotes": ["Optional talk next month."],
+}
+
+
+@pytest.mark.parametrize("field,value", [
+    ("course", 3297), ("deadline", {"date": "2026-10-22"}), ("quotes", [1, 2]), ("action_text", ["submit"]),
+])
+def test_wrongly_typed_fields_go_to_review_not_crash(field, value):
+    bad = {**GOOD, field: value}
+    run = pipeline.run([make_message("Optional talk next month.")], COURSES, NOW, ScriptedClient([bad, bad]))
+    r = run.results[0]
+    assert run.mode == pipeline.MODE_AI
+    assert r.priority is Priority.REVIEW and r.extraction is None

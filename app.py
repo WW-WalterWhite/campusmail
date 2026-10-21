@@ -29,6 +29,7 @@ st.set_page_config(page_title="CampusMail", page_icon="📬", layout="wide")
 state = st.session_state
 state.setdefault("messages", None)
 state.setdefault("source_name", None)
+state.setdefault("last_upload_id", None)
 state.setdefault("run", None)
 state.setdefault("corrections", {})
 state.setdefault("courses_text", "")
@@ -72,7 +73,10 @@ with st.sidebar:
         "Or import a CSV (max 30 messages)", type=["csv"],
         help="Columns: message_id, received (ISO 8601), subject, body, and optional thread_id.",
     )
-    if upload is not None and state.source_name != upload.name:
+    # Load each uploaded file once: a rerun keeps the run and corrections, and an edited file
+    # with the same name is still picked up because it gets a new file_id.
+    if upload is not None and state.last_upload_id != upload.file_id:
+        state.last_upload_id = upload.file_id
         load_messages(upload.getvalue(), upload.name)
 
     st.header("2. Your courses")
