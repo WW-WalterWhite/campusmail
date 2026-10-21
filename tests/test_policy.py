@@ -93,3 +93,14 @@ def test_schedule_change_quotes_the_change_not_the_request():
     message = make_message("The COMP3297 tutorial has been moved to 1 October at 14:30 in Room KK201. Please attend the new session.")
     x = extract_with_rules(message)
     assert x.quotes[0].startswith("The COMP3297 tutorial has been moved")
+
+
+def test_older_thread_message_points_to_a_newer_change():
+    from datetime import timedelta
+    first = make_message("Submit the essay by 9 October.", message_id="a", received=NOW - timedelta(days=2))
+    second = make_message("Update: the essay deadline is extended to 12 October.", message_id="b", received=NOW)
+    first.thread_id = second.thread_id = "t1"
+    run = pipeline.run([first, second], COURSES, NOW)
+    by_id = {r.message.message_id: r for r in run.results}
+    assert by_id["a"].notes and "(b)" in by_id["a"].notes[0]
+    assert not by_id["b"].notes

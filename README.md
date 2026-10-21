@@ -270,7 +270,8 @@ evaluation script and automated tests.
 - Laptop feasibility (time per message, RAM) still has to be measured on team members' machines.
 - The cloud engines and mailbox import are tested against recorded API shapes, not live
   accounts; the first real sign-in and the first paid API call still need to be tried by the team.
-- English only. Messages in one thread are treated separately (no superseded-deadline detection).
+- English only. Messages in one thread are ranked separately; an older message with a deadline only gets a
+  note when a newer message in the same thread mentions a change (correction, extension, move).
 - The date checker understands common English formats (`1 October`, `Oct 1`, `1/10`, `22.10.2026`, `2026-10-01`, `end of day`,
   `today`, `tomorrow`, weekday names). Other phrasings send the message to review rather than
   being guessed.
