@@ -287,5 +287,6 @@ data/                  synthetic sample inbox, labels and course profile
 eval/evaluate.py       evaluation script (docs/EVALUATION.md explains the datasets)
 tests/                 pytest suite
 docs/AI_USE_LOG.md     log of AI assistance used in development
+docs/index.html        project webpage (GitHub Pages: Settings → Pages → Deploy from branch → main, /docs)
 setup.bat / run.bat    Windows setup and launcher (setup.sh / run.sh for macOS and Linux)
 ```
