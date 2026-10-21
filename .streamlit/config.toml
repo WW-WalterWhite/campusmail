@@ -1,0 +1,7 @@
+[browser]
+gatherUsageStats = false
+
+[server]
+# Local use only: do not accept connections from other machines.
+address = "localhost"
+maxUploadSize = 1

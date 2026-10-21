@@ -1,0 +1,8 @@
+__pycache__/
+*.pyc
+.venv/
+.pytest_cache/
+# Evaluation output and any real inbox files stay on your machine.
+results/
+private/
+*.inbox.csv
