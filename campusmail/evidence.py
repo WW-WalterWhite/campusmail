@@ -5,7 +5,7 @@ from __future__ import annotations
 import re
 from datetime import datetime
 
-from .dates import FOREIGN_TZ_PATTERN, find_dates, parse_iso
+from .dates import FOREIGN_TZ_PATTERN, TIME_PATTERN, _parse_time, find_dates, parse_iso
 from .importer import normalise_course
 from .models import Extraction, Message
 
@@ -70,7 +70,41 @@ def check(extraction: Extraction, message: Message) -> tuple[list[str], datetime
         deadline, has_time = _verify_deadline(extraction, message, reasons)
     elif extraction.deadline_status == "explicit":
         reasons.append("Marked as having an explicit deadline but no date was given.")
+    if extraction.source == "model":
+        reasons += check_summary(extraction.summary, message)
     return reasons, deadline, has_time
+
+
+NUMBER = re.compile(r"(?<![\w.])\d+(?:[.,]\d+)?%?")
+
+
+def check_summary(summary: str, message: Message) -> list[str]:
+    """Dates, times and numbers in the model's summary must also be in the email.
+
+    This is a cheap guard against invented facts: the summary is free text, so its quotes are
+    checked elsewhere, but a wrong day, time or figure in the summary would still mislead.
+    """
+    problems = []
+    source_dates = {d.value.date() for d in find_dates(message.text, message.received)}
+    taken: list[tuple[int, int]] = []
+    for d in find_dates(summary, message.received):
+        taken.append((d.start, d.end))
+        if d.value.date() not in source_dates:
+            problems.append(f"The summary mentions {d.text!r}, a date not found in the email.")
+    source_times = {_parse_time(m) for m in TIME_PATTERN.finditer(message.text)}
+    for m in TIME_PATTERN.finditer(summary):
+        if any(m.start() < e and s < m.end() for s, e in taken):
+            continue
+        taken.append((m.start(), m.end()))
+        if _parse_time(m) not in source_times:
+            problems.append(f"The summary mentions the time {m.group(0)!r}, which is not in the email.")
+    source_text = message.text
+    for m in NUMBER.finditer(summary):
+        if any(m.start() < e and s < m.end() for s, e in taken):
+            continue
+        if m.group(0).rstrip("%") not in source_text:
+            problems.append(f"The summary mentions the number {m.group(0)!r}, which is not in the email.")
+    return problems
 
 
 def _verify_deadline(extraction: Extraction, message: Message, reasons: list[str]) -> tuple[datetime | None, bool]:
@@ -99,6 +133,9 @@ def _verify_deadline(extraction: Extraction, message: Message, reasons: list[str
         reasons.append(f"Deadline {claimed:%d %b} does not match the email (“{quote[:60]}”).")
         return None, False
     match = same_day[0]
+    if match.weekday_mismatch:
+        reasons.append(f"The weekday and the date in \u201c{match.text}\u201d disagree; check which one is right.")
+        return None, False
     if has_time and match.has_time and match.value != claimed:
         reasons.append(f"Deadline time {claimed:%H:%M} does not match the email ({match.value:%H:%M}).")
         return None, False

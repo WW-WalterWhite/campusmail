@@ -1,0 +1,41 @@
+message_id,expected_priority,expected_deadline
+d01,High,2026-10-22T23:59
+d02,High,2026-10-23T09:00
+d03,High,2026-10-22T17:00
+d04,High,2026-10-22T12:00
+d05,High,2026-10-22
+d06,High,2026-10-22T10:30
+d07,High,2026-10-19T23:59
+d08,High,2026-10-22
+d09,High,2026-10-21T18:00
+d10,High,2026-10-22T14:00
+d11,Medium,2026-11-20T23:59
+d12,Medium,2026-10-30
+d13,Medium,2026-10-29T14:30
+d14,Medium,
+d15,Medium,
+d16,Medium,2026-11-04
+d17,Medium,
+d18,Medium,2026-11-15
+d19,Medium,2026-10-28T23:59
+d20,Medium,
+d21,Low,
+d22,Low,
+d23,Low,
+d24,Low,
+d25,Low,
+d26,Low,
+d27,Low,
+d28,Low,
+d29,Low,
+d30,Low,
+d31,Needs review,
+d32,Needs review,
+d33,Needs review,
+d34,Needs review,
+d35,Needs review,
+d36,Needs review,
+d37,Needs review,
+d38,Needs review,
+d39,Needs review,
+d40,Needs review,

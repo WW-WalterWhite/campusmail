@@ -36,7 +36,8 @@ def _non_english(text: str) -> bool:
     return non_latin / len(letters) > 0.2
 
 
-def load_csv(data: str | bytes) -> list[Message]:
+def load_csv(data: str | bytes, max_messages: int | None = MAX_MESSAGES) -> list[Message]:
+    """Parse and validate a CSV. The evaluation script passes max_messages=None for larger sets."""
     if isinstance(data, bytes):
         try:
             data = data.decode("utf-8-sig")
@@ -52,8 +53,8 @@ def load_csv(data: str | bytes) -> list[Message]:
         rows = [{k.strip().lower(): (v or "") for k, v in row.items() if k is not None} for row in reader]
     except csv.Error as exc:
         raise CSVImportError(f"The file is not valid CSV: {exc}") from exc
-    if len(rows) > MAX_MESSAGES:
-        raise CSVImportError(f"The file has {len(rows)} messages; the limit is {MAX_MESSAGES}.")
+    if max_messages is not None and len(rows) > max_messages:
+        raise CSVImportError(f"The file has {len(rows)} messages; the limit is {max_messages}.")
 
     messages: list[Message] = []
     seen: set[str] = set()

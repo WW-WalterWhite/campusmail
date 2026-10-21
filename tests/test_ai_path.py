@@ -81,7 +81,8 @@ def test_unsupported_course_goes_to_review():
 
 def test_model_added_time_is_dropped_to_date_only():
     body = "Please submit the COMP3297 form by 1 October."
-    _, r, _ = run_one(body, answer(quotes=[body], deadline="2026-10-01T23:59:00+08:00", deadline_quote="by 1 October"))
+    _, r, _ = run_one(body, answer(quotes=[body], deadline="2026-10-01T23:59:00+08:00", deadline_quote="by 1 October",
+                                    summary="Submit the COMP3297 form by 1 October."))
     assert r.priority is Priority.HIGH and not r.deadline_has_time and r.deadline.hour == 0
 
 
@@ -139,3 +140,23 @@ def test_ollama_client_request_and_response_shape():
     assert request["model"] == "qwen3:4b" and request["stream"] is False
     assert request["format"]["type"] == "object" and request["options"]["temperature"] == 0
     assert run.mode == pipeline.MODE_AI and run.results[0].priority is Priority.HIGH
+
+
+def test_summary_with_invented_date_or_number_goes_to_review():
+    _, r, _ = run_one(LAB, answer(summary="The COMP3297 lab report is due at 17:00 on 2 October."))
+    assert r.priority is Priority.REVIEW and "date not found" in r.reasons[0]
+    _, r, _ = run_one(LAB, answer(summary="The lab report, worth 20% of the grade, is due 1 October."))
+    assert r.priority is Priority.REVIEW and "'20%'" in r.reasons[0]
+    _, r, _ = run_one(LAB, answer(summary="The lab report is due at 6pm on 1 October."))
+    assert r.priority is Priority.REVIEW and "time" in r.reasons[0]
+
+
+def test_summary_may_restate_time_in_another_format():
+    _, r, _ = run_one(LAB, answer(summary="Submit the COMP3297 lab report by 5pm on 1 Oct."))
+    assert r.priority is Priority.HIGH
+
+
+def test_model_deadline_with_wrong_weekday_goes_to_review():
+    body = "Please submit the COMP3297 lab report by 17:00 on Monday 1 October."  # 1 Oct 2026 is a Thursday
+    _, r, _ = run_one(body, answer(quotes=[body], deadline_quote="by 17:00 on Monday 1 October"))
+    assert r.priority is Priority.REVIEW and "weekday" in r.reasons[0]

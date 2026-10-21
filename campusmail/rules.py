@@ -13,14 +13,17 @@ from .models import Extraction, Message
 
 ACTION_PATTERN = re.compile(
     r"\b(?:submit|upload|hand in|complete|register|sign up|enrol|enroll|pay|return|reply|"
-    r"confirm|book|must|required to|need to|needs to|please (?:submit|complete|register|confirm|fill)|"
-    r"fill (?:in|out)|(?:is|are|was|were) due|due (?:by|on|at|before)|deadline)\b",
+    r"confirm|book|must|required to|need to|needs to|please (?:submit|complete|register|confirm|fill|attend)|"
+    r"fill (?:in|out)|finali[sz]e|(?:is|are|was|were) due|due(?: by| on| at| before)|deadline)\b|\bdue:",
     re.I,
 )
 OPTIONAL_PATTERN = re.compile(r"\b(?:optional|if you are interested|welcome to join|feel free|no action (?:is )?(?:needed|required))\b", re.I)
+# Sentences that state when something closes or is due, even without an action verb.
+TIMING_PATTERN = re.compile(r"\b(?:closes?|due|deadline|by|before|no later than|until)\b", re.I)
 CORRECTION_PATTERN = re.compile(r"\b(?:correction|corrected|instead of|not on|typo|earlier email|previous email)\b", re.I)
 CATEGORY_RULES = [
-    ("schedule_change", r"\b(?:rescheduled|moved to|postponed|cancelled|canceled|change of venue|venue change|room change|now (?:be )?held)\b"),
+    ("schedule_change", r"\b(?:rescheduled|moved to|postponed|cancelled|canceled|change of venue|venue change|room change|now (?:be )?held|make-?up (?:class|lecture|tutorial)|extra (?:class|lecture|tutorial)|"
+                        r"(?:held|move[ds]?) online|instead of in person|no (?:class|lecture|tutorial|lab)s?)\b"),
     ("exam", r"\b(?:exam|examination|midterm|mid-term|quiz|test)\b"),
     ("assignment", r"\b(?:assignment|homework|report|essay|lab report|submission|project)\b"),
     ("group_work", r"\b(?:group|team|teammates?|groupmates?)\b"),
@@ -61,8 +64,13 @@ def extract_with_rules(message: Message) -> Extraction:
         if CORRECTION_PATTERN.search(full) and category != "schedule_change":
             timing_sentences = sentences  # a correction elsewhere in the email may contradict the date
         found = [(s, d) for s in timing_sentences for d in find_dates(s, message.received)]
+        if not found and category != "schedule_change":
+            # "The quiz closes on 22/10 at 12:00. You must complete it." puts the date in another sentence.
+            found = [(s, d) for s in sentences if TIMING_PATTERN.search(s) for d in find_dates(s, message.received)]
         distinct = {d.value for _, d in found}
         if len(distinct) > 1 and category != "schedule_change" and CORRECTION_PATTERN.search(full):
+            deadline_status = "conflicting"
+        elif any(d.weekday_mismatch for _, d in found):
             deadline_status = "conflicting"
         elif found:
             # For a schedule change the last date mentioned is usually the new one; for actions
@@ -71,7 +79,7 @@ def extract_with_rules(message: Message) -> Extraction:
             deadline = match.value.isoformat() if match.has_time else match.value.date().isoformat()
             deadline_quote = match.text
             deadline_status = "explicit"
-        elif any(has_vague_timing(s) for s in timing_sentences):
+        elif has_vague_timing(full):
             deadline_status = "vague"
 
     # Skip greetings and sign-offs ("Dear class,", "Regards,") when choosing key sentences.

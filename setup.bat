@@ -20,6 +20,6 @@ echo Setup finished. Double-click run.bat to start CampusMail.
 pause
 exit /b 0
 :error
-echo Setup failed. Check that Python 3.10 or newer is installed from https://www.python.org/downloads/
+echo Setup failed. Check that Python 3.11 or newer is installed from https://www.python.org/downloads/
 pause
 exit /b 1
