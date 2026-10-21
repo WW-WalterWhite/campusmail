@@ -50,3 +50,11 @@ def test_vague_and_iso():
     assert parse_iso("2026-10-01") == (datetime(2026, 10, 1, tzinfo=HKT), False)
     assert parse_iso("2026-10-01T09:00:00Z")[0] == datetime(2026, 10, 1, 17, 0, tzinfo=HKT)
     assert parse_iso("next Friday") == (None, False)
+
+
+def test_end_of_day_and_dotted_dates():
+    [m] = find_dates("Lab 6 is due by end of day Thursday 22nd Oct.", NOW)
+    assert (m.value.day, m.value.hour, m.value.minute) == (22, 23, 59)
+    [m] = find_dates("Submit on or before 22.10.2026.", NOW)
+    assert m.value.date().isoformat() == "2026-10-22"
+    assert find_dates("The office opens at 17.00 today.", NOW)[0].value.hour == 17  # 17.00 is a time, not a date

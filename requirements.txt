@@ -1,4 +1,4 @@
-# Pinned for reproducible setup. Python 3.10 or newer.
+# Pinned for reproducible setup. Python 3.11 or newer.
 streamlit==1.66.0
 requests==2.34.2
 # Optional mailbox import (Outlook / Microsoft 365 and Gmail sign-in)

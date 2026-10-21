@@ -80,3 +80,10 @@ def test_rules_quotes_are_copied_from_the_email():
     x = extract_with_rules(message)
     assert all(q in message.body for q in x.quotes)
     assert x.quotes == ["Please submit the lab report by 17:00 on 1 October."]
+
+
+def test_weekday_that_disagrees_with_date_goes_to_review():
+    # 2 October 2026 is a Friday.
+    assert rules_priority("Submit the form by Friday 2 October.").priority is Priority.HIGH
+    r = rules_priority("Submit the form by Thursday 2 October.")
+    assert r.priority is Priority.REVIEW

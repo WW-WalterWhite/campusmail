@@ -20,7 +20,7 @@ and [Optional: import from Outlook or Gmail](#optional-import-from-outlook-or-gm
 
 ### 1. Prerequisites (once)
 
-- **Python 3.10 or newer** from <https://www.python.org/downloads/>. On Windows, tick
+- **Python 3.11 or newer** (3.12 or 3.13 recommended) from <https://www.python.org/downloads/>. On Windows, tick
   *"Add python.exe to PATH"* in the installer.
 - **Ollama** from <https://ollama.com/download>. Install it and leave it running (on Windows and
   macOS it sits in the system tray / menu bar).
@@ -220,15 +220,20 @@ You can also type a different model name in the sidebar.
 ## Evaluation
 
 ```bash
-python eval/evaluate.py                                  # rules baseline on the sample inbox
-python eval/evaluate.py --engine ollama                  # the local model
-python eval/evaluate.py --inbox data/dev.csv --labels data/dev_labels.csv \
-       --engine ollama --out results/dev_ollama.csv      # your own labelled set, raw results saved
+python eval/evaluate.py                                   # rules baseline on the sample inbox
+python eval/evaluate.py --set dev                         # the 40-message development set
+python eval/evaluate.py --set dev --engine ollama --repeat 5 --out results/dev_qwen3
+python eval/evaluate.py --inbox my.csv --labels my_labels.csv   # your own labelled set
 ```
 
 It prints macro-F1 over messages labelled High/Medium/Low, how many High messages were predicted
-High (a "Needs review" prediction counts as a miss), how many review cases were flagged, a
-confusion matrix and the mismatches. Labels CSV columns: `message_id, expected_priority`.
+High (a "Needs review" prediction counts as a miss), how many review cases were flagged,
+deadline recovery with the **safety gate** (any invented or wrong deadline fails it), run and
+per-message times, a confusion matrix and the mismatches. Labels CSV columns:
+`message_id, expected_priority, expected_deadline` (the last is optional).
+
+See [docs/EVALUATION.md](docs/EVALUATION.md) for the bundled datasets, how much their scores can
+be trusted, and the results table to fill in.
 
 ## Tests
 
@@ -254,13 +259,13 @@ evaluation script and automated tests.
 
 **Not yet / known limits:**
 
-- The model prompt has not yet been tuned on the 40-message development set, and the 80-message
-  locked test set does not exist yet. No accuracy figures are claimed.
+- The 40-message development set has draft labels that the team still has to check, and the
+  80-message locked test set does not exist yet. No accuracy figures are claimed.
 - Laptop feasibility (time per message, RAM) still has to be measured on team members' machines.
 - The cloud engines and mailbox import are tested against recorded API shapes, not live
   accounts; the first real sign-in and the first paid API call still need to be tried by the team.
 - English only. Messages in one thread are treated separately (no superseded-deadline detection).
-- The date checker understands common English formats (`1 October`, `Oct 1`, `1/10`, `2026-10-01`,
+- The date checker understands common English formats (`1 October`, `Oct 1`, `1/10`, `22.10.2026`, `2026-10-01`, `end of day`,
   `today`, `tomorrow`, weekday names). Other phrasings send the message to review rather than
   being guessed.
 - The injection check is a phrase list. It catches common patterns, not all of them; it only
@@ -272,7 +277,7 @@ evaluation script and automated tests.
 app.py                 Streamlit app
 campusmail/            pipeline modules (see "How it works")
 data/                  synthetic sample inbox, labels and course profile
-eval/evaluate.py       evaluation script
+eval/evaluate.py       evaluation script (docs/EVALUATION.md explains the datasets)
 tests/                 pytest suite
 docs/AI_USE_LOG.md     log of AI assistance used in development
 setup.bat / run.bat    Windows setup and launcher (setup.sh / run.sh for macOS and Linux)

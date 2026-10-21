@@ -38,6 +38,8 @@ DATE_PATTERNS = [
     re.compile(r"\b(?P<year>20\d\d)-(?P<month>[01]?\d)-(?P<day>[0-3]?\d)\b"),
     # 1/10/2026 or 1/10 (day/month, Hong Kong convention)
     re.compile(r"\b(?P<day>[0-3]?\d)/(?P<month>[01]?\d)(?:/(?P<year>(?:20)?\d\d))?\b"),
+    # 22.10.2026 (dots need the year, otherwise "17.00" would read as a date)
+    re.compile(r"\b(?P<day>[0-3]?\d)\.(?P<month>[01]?\d)\.(?P<year>20\d\d)\b"),
 ]
 RELATIVE_PATTERN = re.compile(
     rf"\b(?P<rel>today|tonight|tomorrow|(?:(?P<mod>this|next|coming)\s+)?(?P<wd>{_WEEKDAY_NAMES}))\b",
@@ -46,7 +48,7 @@ RELATIVE_PATTERN = re.compile(
 TIME_PATTERN = re.compile(
     r"\b(?:(?P<h24>[01]?\d|2[0-3])[:.](?P<m24>[0-5]\d)(?:\s*(?P<ap1>[ap])\.?m\.?)?"
     r"|(?P<h12>1[0-2]|0?[1-9])\s*(?P<ap2>[ap])\.?m\.?"
-    r"|(?P<word>noon|midday|midnight))\b",
+    r"|(?P<word>noon|midday|midnight|end of (?:the )?day|eod))\b",
     re.I,
 )
 # Zones other than Hong Kong time. Their presence makes a deadline unverifiable for us.
@@ -57,7 +59,7 @@ FOREIGN_TZ_PATTERN = re.compile(
 )
 VAGUE_PATTERN = re.compile(
     r"\b(?:soon|as soon as possible|asap|shortly|in due course|at your earliest convenience|"
-    r"later this (?:week|month)|next (?:week|month)|sometime|before long)\b",
+    r"later this (?:week|month)|next (?:week|month)|sometime|before long|before the deadline)\b",
     re.I,
 )
 
@@ -72,6 +74,7 @@ class DateMatch:
     value: datetime  # timezone-aware, UTC+8
     has_time: bool
     foreign_tz: bool = False
+    weekday_mismatch: bool = False  # e.g. "Friday 22 October" when 22 October is a Thursday
 
 
 def _year_for(month: int, day: int, ref: datetime) -> int:
@@ -89,7 +92,10 @@ def _year_for(month: int, day: int, ref: datetime) -> int:
 
 def _parse_time(m: re.Match) -> time:
     if m.group("word"):
-        return time(0, 0) if m.group("word").lower() == "midnight" else time(12, 0)
+        word = m.group("word").lower()
+        if word == "midnight":
+            return time(0, 0)
+        return time(12, 0) if word in ("noon", "midday") else time(23, 59)  # "end of day"
     if m.group("h24") is not None:
         hour, minute = int(m.group("h24")), int(m.group("m24"))
         ap = m.group("ap1")
@@ -120,7 +126,9 @@ def _nearest_time(text: str, start: int, end: int, taken: list[tuple[int, int]])
 
 def _sentence_bounds(text: str, start: int, end: int) -> tuple[int, int]:
     """Bounds of the sentence containing text[start:end] (sentences end at . ! ? or newline)."""
-    lo = max(text.rfind(c, 0, start) for c in ".!?\n") + 1
+    # A full stop only ends a sentence when whitespace follows, so "17.00" stays one token.
+    stops = [m.end() for m in re.finditer(r"[.!?](?=\s)|\n", text[:start])]
+    lo = stops[-1] if stops else 0
     ends = [i for i in (text.find(c, end) for c in "!?\n") if i != -1]
     dot = re.search(r"\.(?:\s|$)", text[end:])
     if dot:
@@ -154,10 +162,20 @@ def find_dates(text: str, ref: datetime) -> list[DateMatch]:
             if text[end - 1] == "." and month_raw.lower() not in ("jan", "feb", "mar", "apr", "jun", "jul", "aug", "sep", "sept", "oct", "nov", "dec"):
                 end -= 1  # a full stop after "October" ends the sentence; after "Oct" it is an abbreviation
             raw.append((m.start(), end, d))
+    explicit = list(raw)
+    mismatched: set[int] = set()  # start positions of explicit dates whose weekday disagrees
     for m in RELATIVE_PATTERN.finditer(text):
         if any(m.start() < e and s < m.end() for s, e, _ in raw):
             continue
         rel = m.group("rel").lower()
+        if m.group("wd") and not m.group("mod"):
+            # "Thursday 22 October" / "22 October (Thu)": the weekday belongs to the explicit date.
+            beside = next((x for x in explicit if re.fullmatch(r"[\s,()]{0,3}", text[m.end():x[0]])
+                           or re.fullmatch(r"[\s,()]{0,3}", text[x[1]:m.start()])), None)
+            if beside is not None:
+                if WEEKDAYS[m.group("wd").lower()] != beside[2].weekday():
+                    mismatched.add(beside[0])
+                continue
         if rel in ("today", "tonight"):
             d = ref.date()
         elif rel == "tomorrow":
@@ -188,7 +206,7 @@ def find_dates(text: str, ref: datetime) -> list[DateMatch]:
         else:
             value = datetime.combine(d, time(0, 0), tzinfo=HKT)
             span_text = text[start:end]
-        results.append(DateMatch(span_text, start, end, value, bool(tm), foreign))
+        results.append(DateMatch(span_text, start, end, value, bool(tm), foreign, start in mismatched))
     return results
 
 
