@@ -5,3 +5,7 @@ gatherUsageStats = false
 # Local use only: do not accept connections from other machines.
 address = "localhost"
 maxUploadSize = 1
+
+[client]
+# Hide the developer toolbar (Deploy button) for classmates using the app.
+toolbarMode = "minimal"

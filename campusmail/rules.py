@@ -84,7 +84,11 @@ def extract_with_rules(message: Message) -> Extraction:
 
     # Skip greetings and sign-offs ("Dear class,", "Regards,") when choosing key sentences.
     content = [s for s in sentences if len(s.split()) >= 4]
-    quotes = ([s for s in action_sentences if s in content] or content or sentences)[:2]
+    key = action_sentences
+    if category == "schedule_change":
+        # The sentence that says what changed matters more than "Please attend".
+        key = [s for s in sentences if re.search(CATEGORY_RULES[0][1], s, re.I)] + action_sentences
+    quotes = list(dict.fromkeys([s for s in key if s in content] or content or sentences))[:2]
     summary_words = " ".join(quotes).split()
     summary = " ".join(summary_words[:60])
     return Extraction(

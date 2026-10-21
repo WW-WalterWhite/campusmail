@@ -87,3 +87,9 @@ def test_weekday_that_disagrees_with_date_goes_to_review():
     assert rules_priority("Submit the form by Friday 2 October.").priority is Priority.HIGH
     r = rules_priority("Submit the form by Thursday 2 October.")
     assert r.priority is Priority.REVIEW
+
+
+def test_schedule_change_quotes_the_change_not_the_request():
+    message = make_message("The COMP3297 tutorial has been moved to 1 October at 14:30 in Room KK201. Please attend the new session.")
+    x = extract_with_rules(message)
+    assert x.quotes[0].startswith("The COMP3297 tutorial has been moved")
