@@ -81,6 +81,7 @@ class Result:
     overdue: bool = False
     review_reasons: list[str] = field(default_factory=list)
     assumptions: list[str] = field(default_factory=list)
+    notes: list[str] = field(default_factory=list)  # e.g. a newer message in the thread
     corrected: bool = False
 
     @property

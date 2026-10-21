@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 import time
 from collections.abc import Callable
 from dataclasses import dataclass, field
@@ -12,7 +13,9 @@ from .extraction import InvalidOutput, extract_with_model
 from .llm import LLMClient, LLMUnavailable
 from .models import Message, Priority, Result
 from .priority import decide
-from .rules import extract_with_rules
+from .rules import CORRECTION_PATTERN, extract_with_rules
+
+CHANGE_WORDS = re.compile(CORRECTION_PATTERN.pattern + r"|\b(?:extended|postponed|moved|changed|update[ds]?)\b", re.I)
 
 MODE_AI = "ai"
 MODE_RULES = "rules"
@@ -77,6 +80,7 @@ def run(
             continue
         timings[message.message_id] = time.perf_counter() - t0
         results.append(_process(message, extraction, courses, now))
+    link_threads(results)
     return Run(results, MODE_AI, None, client.name, time.perf_counter() - started, timings)
 
 
@@ -85,4 +89,24 @@ def _rules_run(messages, courses, now, started, notice) -> Run:
         _invalid(m) if m.problems else _process(m, extract_with_rules(m), courses, now)
         for m in messages
     ]
+    link_threads(results)
     return Run(results, MODE_RULES, notice, "keyword/date rules", time.perf_counter() - started)
+
+
+def link_threads(results: list[Result]) -> None:
+    """Point older messages to newer ones in the same thread that may change them.
+
+    Messages are still ranked one by one (the outline's MVP rule); this only adds a visible
+    note, so a deadline that a later reply moved is not acted on unseen.
+    """
+    threads: dict[str, list[Result]] = {}
+    for r in results:
+        if r.message.thread_id and r.message.received:
+            threads.setdefault(r.message.thread_id, []).append(r)
+    for group in threads.values():
+        group.sort(key=lambda r: r.message.received)
+        for i, older in enumerate(group):
+            newer = [r for r in group[i + 1:] if CHANGE_WORDS.search(r.message.text)]
+            if older.deadline is not None and newer:
+                ids = ", ".join(r.message.message_id for r in newer)
+                older.notes.append(f"A newer message in this thread ({ids}) may change this deadline; read it first.")

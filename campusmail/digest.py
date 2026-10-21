@@ -38,6 +38,8 @@ def render_text(run: Run, now: datetime) -> str:
                     lines.append(f"    Source [{m.message_id}]: “{q}”")
             for reason in r.reasons:
                 lines.append(f"    Why: {reason}")
+            for note in r.notes:
+                lines.append(f"    Note: {note}")
             for note in r.assumptions:
                 lines.append(f"    Assumption: {note}")
     return "\n".join(lines) + "\n"

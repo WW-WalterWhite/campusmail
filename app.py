@@ -176,6 +176,8 @@ def show_result(result) -> None:
     with st.expander(title, expanded=result.priority in (Priority.REVIEW, Priority.HIGH)):
         for reason in result.reasons:
             st.markdown(f"**Why:** {reason}")
+        for note in result.notes:
+            st.warning(note, icon="🧵")
         for note in result.assumptions:
             st.caption(f"Assumption: {note}")
         if x is not None and result.priority is not Priority.REVIEW:
