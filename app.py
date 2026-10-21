@@ -149,7 +149,7 @@ for col, priority in zip(cols, Priority):
 
 def correction_form(result) -> None:
     mid = result.message.message_id
-    with st.form(f"fix-{mid}", border=False):
+    with st.popover("Correct priority or deadline"), st.form(f"fix-{mid}", border=False):
         c1, c2, c3 = st.columns([2, 2, 1])
         options = [p.value for p in Priority]
         new_priority = c1.selectbox("Priority", options, index=options.index(result.priority.value), key=f"p-{mid}")
@@ -183,12 +183,18 @@ def show_result(result) -> None:
                 st.markdown(f"**Action:** {x.action_text}")
             if result.deadline:
                 st.markdown(f"**Deadline:** {format_dt(result.deadline, result.deadline_has_time)}")
-            label = "Summary" if x.source == "model" else "Key sentences (copied by rules)"
-            st.markdown(f"**{label}:** {x.summary}")
+            if x.source == "model":
+                st.markdown(f"**Summary:** {x.summary}")
+            else:
+                st.markdown("**Key sentences** (copied from the email by the rules, no AI summary):")
             for q in x.quotes:
                 st.markdown(f"> “{q}”  \n> — [{m.message_id}](#{anchor(m.message_id)})")
         else:
-            st.markdown(f"No summary is shown for messages that need review. [Read the original](#{anchor(m.message_id)}).")
+            st.markdown("No summary is shown for messages that need review. The original email:")
+            with st.container(border=True):
+                st.text(m.body if len(m.body) <= 1200 else m.body[:1200] + " …")
+            if len(m.body) > 1200:
+                st.markdown(f"[Read the whole email](#{anchor(m.message_id)})")
         correction_form(result)
 
 
