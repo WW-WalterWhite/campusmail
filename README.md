@@ -22,7 +22,7 @@ and [Optional: import from Outlook or Gmail](#optional-import-from-outlook-or-gm
 
 - **Python 3.11 or newer** (3.12 or 3.13 recommended) from <https://www.python.org/downloads/>. On Windows, tick
   *"Add python.exe to PATH"* in the installer.
-- **Ollama** from <https://ollama.com/download>. Install it and leave it running (on Windows and
+- **Ollama 0.9 or newer** from <https://ollama.com/download>. Install it and leave it running (on Windows and
   macOS it sits in the system tray / menu bar).
 
 ### 2. Setup (once)
@@ -210,7 +210,7 @@ delimited untrusted data.
 |---|---|---|
 | `CAMPUSMAIL_MODEL` | `qwen3:4b` | Ollama model tag (e.g. `qwen3:1.7b` on a slow laptop) |
 | `OLLAMA_HOST` | `http://localhost:11434` | where Ollama listens |
-| `CAMPUSMAIL_TIMEOUT` | `120` | seconds to wait for one model answer |
+| `CAMPUSMAIL_TIMEOUT` | `120` | seconds to wait for one model answer (the first answer, which also loads the model, may take up to 300 s) |
 | `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `DEEPSEEK_API_KEY`, `DASHSCOPE_API_KEY`, `CAMPUSMAIL_API_KEY` | none | cloud engine keys (optional) |
 | `CAMPUSMAIL_MS_CLIENT_ID`, `CAMPUSMAIL_MS_TENANT` | none, `common` | Microsoft app registration for Outlook import |
 | `CAMPUSMAIL_GOOGLE_CLIENT_FILE` | `secrets/google_client_secret.json` | Google OAuth client file for Gmail import |

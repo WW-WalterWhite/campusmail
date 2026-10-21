@@ -27,12 +27,20 @@ def _plain_quotes(text: str) -> str:
 
 def locate(quote: str, message: Message) -> tuple[int, int] | None:
     """Span of the quote in message.text, ignoring case, whitespace and curly quotes."""
-    words = _plain_quotes(quote).strip(" .\"'").split()
-    if not words:
+    # A quote shortened with "..." must still match each part, in order.
+    parts = [p.strip(" .\"'").split() for p in re.split(r"\.\.\.|\u2026", _plain_quotes(quote))]
+    parts = [p for p in parts if p]
+    if not parts:
         return None
-    pattern = r"\s+".join(re.escape(w) for w in words)
-    m = re.search(pattern, _plain_quotes(message.text), re.I)
-    return (m.start(), m.end()) if m else None
+    source = _plain_quotes(message.text)
+    start, pos = None, 0
+    for words in parts:
+        m = re.compile(r"\s+".join(re.escape(w) for w in words), re.I).search(source, pos)
+        if not m:
+            return None
+        start = m.start() if start is None else start
+        pos = m.end()
+    return start, pos
 
 
 def quote_in_source(quote: str, message: Message) -> bool:

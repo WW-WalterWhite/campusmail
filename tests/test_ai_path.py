@@ -160,3 +160,51 @@ def test_model_deadline_with_wrong_weekday_goes_to_review():
     body = "Please submit the COMP3297 lab report by 17:00 on Monday 1 October."  # 1 Oct 2026 is a Thursday
     _, r, _ = run_one(body, answer(quotes=[body], deadline_quote="by 17:00 on Monday 1 October"))
     assert r.priority is Priority.REVIEW and "weekday" in r.reasons[0]
+
+
+def test_reasoning_trace_and_code_fence_are_ignored():
+    import json as _json
+    wrapped = "<think>The user wants JSON.</think>\n```json\n" + _json.dumps(answer()) + "\n```"
+    _, r, client = run_one(LAB, wrapped)
+    assert len(client.calls) == 1 and r.priority is Priority.HIGH
+
+
+def test_quote_shortened_with_ellipsis_still_matches():
+    _, r, _ = run_one(LAB, answer(quotes=["Please submit the COMP3297 lab report ... on 1 October."]))
+    assert r.priority is Priority.HIGH
+    _, r, _ = run_one(LAB, answer(quotes=["Please submit ... the exam paper"]))
+    assert r.priority is Priority.REVIEW
+
+
+class _Resp:
+    def __init__(self, status, payload):
+        self.status_code, self._payload = status, payload
+        self.text = str(payload)
+
+    def json(self):
+        return self._payload
+
+
+def test_ollama_error_message_is_passed_on(monkeypatch):
+    import campusmail.llm as llm_module
+    monkeypatch.setattr(llm_module.requests, "post",
+                        lambda *a, **k: _Resp(500, {"error": "model requires more system memory (5.1 GiB)"}))
+    run = pipeline.run([make_message(LAB)], COURSES, NOW, OllamaClient())
+    assert run.mode == pipeline.MODE_RULES and "more system memory" in run.notice
+
+
+def test_old_ollama_is_reported(monkeypatch):
+    import campusmail.llm as llm_module
+
+    def fake_get(url, timeout):
+        if url.endswith("/api/version"):
+            return _Resp(200, {"version": "0.4.7"})
+        return _Resp(200, {"models": [{"name": "qwen3:4b", "model": "qwen3:4b"}]})
+    monkeypatch.setattr(llm_module.requests, "get", lambda url, timeout: _ok(fake_get(url, timeout)))
+    ready, status = OllamaClient().status()
+    assert not ready and "too old" in status
+
+
+def _ok(resp):
+    resp.raise_for_status = lambda: None
+    return resp
