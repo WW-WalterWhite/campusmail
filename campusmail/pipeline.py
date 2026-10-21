@@ -79,7 +79,11 @@ def run(
             results.append(Result(message, None, Priority.REVIEW, [reason], review_reasons=[reason]))
             continue
         timings[message.message_id] = time.perf_counter() - t0
-        results.append(_process(message, extraction, courses, now))
+        try:
+            results.append(_process(message, extraction, courses, now))
+        except Exception:  # noqa: BLE001 - one odd answer must not stop the whole inbox
+            reason = "The AI output could not be processed. No summary was generated for this message."
+            results.append(Result(message, None, Priority.REVIEW, [reason], review_reasons=[reason]))
     link_threads(results)
     return Run(results, MODE_AI, None, client.name, time.perf_counter() - started, timings)
 

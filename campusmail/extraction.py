@@ -79,6 +79,8 @@ def build_user_prompt(message: Message) -> str:
 
 def validate_output(raw: str) -> Extraction:
     """Parse and type-check the model's answer. Raises InvalidOutput with a short reason."""
+    if not isinstance(raw, str):
+        raise InvalidOutput("the answer is not text")
     # Small models sometimes wrap the JSON in a reasoning trace or a code fence; keep the object only.
     text = re.sub(r"<think>.*?</think>", "", raw, flags=re.S).strip()
     first, last = text.find("{"), text.rfind("}")
@@ -99,8 +101,11 @@ def validate_output(raw: str) -> Extraction:
         raise InvalidOutput(f"unknown deadline_status {data['deadline_status']!r}")
     if not isinstance(data["action_required"], bool):
         raise InvalidOutput("action_required must be true or false")
-    if not isinstance(data["quotes"], list):
-        raise InvalidOutput("quotes must be a list")
+    for key in ("course", "action_text", "deadline", "deadline_quote"):
+        if data[key] is not None and not isinstance(data[key], str):
+            raise InvalidOutput(f"{key} must be text or null")
+    if not isinstance(data["quotes"], list) or not all(isinstance(q, str) for q in data["quotes"]):
+        raise InvalidOutput("quotes must be a list of text")
     if not isinstance(data["summary"], str) or not data["summary"].strip():
         raise InvalidOutput("summary is empty")
     if len(data["summary"].split()) > MAX_SUMMARY_WORDS:
