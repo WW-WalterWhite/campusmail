@@ -2,9 +2,11 @@
 
 from __future__ import annotations
 
+import base64
 import copy
-import re
+import html
 import json
+import re
 from datetime import datetime
 from pathlib import Path
 
@@ -17,6 +19,7 @@ from campusmail.importer import CSVImportError, load_csv, parse_course_list, par
 from campusmail.llm import CLOUD_PROVIDERS, DEFAULT_MODEL, LLMUnavailable, OllamaClient, cloud_client, key_from_env
 from campusmail.models import Priority
 from campusmail.priority import apply_correction
+from campusmail.ui import md, until
 
 DATA = Path(__file__).parent / "data"
 SAMPLE_INBOX = DATA / "sample_inbox.csv"
@@ -24,9 +27,19 @@ SAMPLE_PROFILE = json.loads((DATA / "sample_profile.json").read_text(encoding="u
 ENGINE_AI = "Local AI (Ollama)"
 ENGINE_CLOUD = "Cloud AI (API key)"
 ENGINE_RULES = "Rules only (no AI)"
-BADGE = {Priority.REVIEW: "🟣", Priority.HIGH: "🔴", Priority.MEDIUM: "🟠", Priority.LOW: "⚪"}
+# slug for CSS keys, Streamlit colour name, Material icon, one-line meaning
+BAND = {
+    Priority.REVIEW: ("review", "violet", "policy", "Check these yourself first"),
+    Priority.HIGH: ("high", "red", "priority_high", "Due within 48 hours or overdue"),
+    Priority.MEDIUM: ("medium", "orange", "schedule", "Action needed, not urgent"),
+    Priority.LOW: ("low", "gray", "inbox", "For information"),
+}
+ASSETS = Path(__file__).parent / "assets"
+LOGO = "data:image/svg+xml;base64," + base64.b64encode((ASSETS / "logo.svg").read_bytes()).decode()
 
 st.set_page_config(page_title="CampusMail", page_icon="📬", layout="wide")
+st.html(f"<style>{(ASSETS / 'campusmail.css').read_text(encoding='utf-8')}</style>")
+st.logo(str(ASSETS / "logo.svg"), size="large")
 state = st.session_state
 state.setdefault("messages", None)
 state.setdefault("source_name", None)
@@ -152,8 +165,8 @@ def clear_session() -> None:
 
 # ---------------------------------------------------------------- sidebar
 with st.sidebar:
-    st.header("1. Inbox")
-    if st.button("Load sample inbox", width="stretch"):
+    st.subheader(":material/inbox: 1 · Inbox")
+    if st.button("Load sample inbox", width="stretch", icon=":material/science:"):
         load_messages(SAMPLE_INBOX.read_bytes(), "sample inbox (synthetic)")
         use_sample_profile()
     upload = st.file_uploader(
@@ -167,8 +180,8 @@ with st.sidebar:
         load_messages(upload.getvalue(), upload.name)
     mailbox_import()
 
-    st.header("2. Your courses")
-    if st.button("Use sample course profile", width="stretch"):
+    st.subheader(":material/school: 2 · Your courses")
+    if st.button("Use sample course profile", width="stretch", icon=":material/person:"):
         use_sample_profile()
     st.text_area("Course codes", key="courses_text", placeholder="e.g. COMP3297, AILT9019", height=80)
     st.caption("Reference time (Hong Kong time, UTC+8)")
@@ -176,7 +189,7 @@ with st.sidebar:
     col_d.date_input("Date", key="ref_date", label_visibility="collapsed")
     col_t.time_input("Time", key="ref_time", label_visibility="collapsed", step=300)
 
-    st.header("3. Engine")
+    st.subheader(":material/memory: 3 · Engine")
     engine = st.radio("Extraction engine", [ENGINE_AI, ENGINE_CLOUD, ENGINE_RULES], label_visibility="collapsed")
     client = None
     cloud_blocked = None  # reason the cloud engine cannot run yet
@@ -207,32 +220,59 @@ with st.sidebar:
             cloud_blocked = cloud_blocked or "Tick the box to confirm that the emails may be sent to the provider."
 
     st.divider()
-    if st.button("Clear session", width="stretch", help="Forget the inbox, results and corrections."):
+    if st.button("Clear session", width="stretch", icon=":material/delete_sweep:",
+                 help="Forget the inbox, results and corrections."):
         clear_session()
         st.rerun()
     st.caption("Nothing is saved or logged. With Local AI or Rules, everything stays on this computer; "
                "with Cloud AI, email text is sent to the chosen provider.")
 
 # ---------------------------------------------------------------- main
-st.title("📬 CampusMail")
-st.caption("Email priority sorter and AI summarizer for students. " + DISCLAIMER)
-
 courses = parse_course_list(state.courses_text)
 now = datetime.combine(state.ref_date, state.ref_time, tzinfo=HKT)
 
+
+def chips(items: list[tuple[str, str]]) -> str:
+    return '<div class="cm-chips">' + "".join(
+        f'<span class="cm-chip">{html.escape(k)} <b>{html.escape(v)}</b></span>' for k, v in items) + "</div>"
+
+
+st.html(f'''<div class="cm-hero"><img src="{LOGO}" width="48" height="48" alt=""><div><h1>CampusMail</h1>
+<p>Find the course emails that need you today, with the reason and the source for every decision.</p></div></div>''')
+
 if state.messages is None:
-    st.info("Start with **Load sample inbox** in the sidebar, or import your own CSV.")
+    st.write("")
+    steps = [
+        (":material/inbox:", "Load emails", "Try the **sample inbox**, import a CSV, or connect Gmail or Outlook "
+         "(read-only) in the sidebar."),
+        (":material/school:", "Add your courses", "Course codes let CampusMail rank updates about *your* courses "
+         "higher. The sample profile fills them in."),
+        (":material/auto_awesome:", "Sort and summarize", "Every email gets a priority, a reason and quoted "
+         "sources. Unclear ones go to **Needs review**."),
+    ]
+    for col, (icon, title, text) in zip(st.columns(3), steps):
+        with col.container(border=True, height="stretch"):
+            st.markdown(f"#### {icon} {title}")
+            st.markdown(text)
+    st.caption(":material/lock: With Local AI or Rules, nothing leaves this computer, and nothing is saved or logged. "
+               + DISCLAIMER)
     st.stop()
 
+engine_label = {ENGINE_AI: f"Local AI · {client.model}" if client else "Local AI",
+                ENGINE_CLOUD: "Cloud AI", ENGINE_RULES: "Rules only"}[engine]
+st.html(chips([
+    ("Inbox", f"{len(state.messages)} messages · {state.source_name}"),
+    ("Courses", ", ".join(courses) if courses else "none entered"),
+    ("Reference time", f"{now:%a %d %b %Y %H:%M} HKT"),
+    ("Engine", engine_label),
+]))
 if state.get("real_mail"):
-    st.caption("These are real emails from your account. They are held in memory only; "
+    st.caption(":material/lock: These are real emails from your account. They are held in memory only; "
                "**Clear session** forgets them and the sign-in.")
-st.write(f"**{len(state.messages)} messages** from {state.source_name}. "
-         f"Courses: {', '.join(courses) if courses else 'none entered'}. Reference time: {now:%a %d %b %Y %H:%M}.")
 
 if cloud_blocked:
-    st.info(cloud_blocked)
-if st.button("Sort and summarize", type="primary", disabled=bool(cloud_blocked)):
+    st.info(cloud_blocked, icon=":material/key:")
+if st.button("Sort and summarize", type="primary", disabled=bool(cloud_blocked), icon=":material/auto_awesome:"):
     bar = st.progress(0.0, text="Starting…")
 
     def progress(i: int, total: int) -> None:
@@ -243,6 +283,7 @@ if st.button("Sort and summarize", type="primary", disabled=bool(cloud_blocked))
     bar.empty()
 
 if state.run is None:
+    st.caption(DISCLAIMER)
     st.stop()
 
 # Re-apply the student's corrections on a copy, so changing one updates the digest immediately.
@@ -253,22 +294,25 @@ for result in run.results:
         apply_correction(result, fix.get("priority"), fix.get("deadline"), now)
 
 if run.notice:
-    st.error(run.notice, icon="⚠️")
+    st.error(run.notice, icon=":material/warning:")
 if run.mode == pipeline.MODE_RULES:
     st.warning("**Rules-only view.** Priorities come from keyword and date rules, and the "
-               "“key sentences” are copied from each email. There are no AI summaries.")
+               "“key sentences” are copied from each email. There are no AI summaries.", icon=":material/rule:")
 else:
-    st.success(f"Processed by {run.model_name} in {run.seconds:.1f} s.")
+    st.success(f"Processed by {run.model_name} in {run.seconds:.1f} s.", icon=":material/check_circle:")
 
 groups = run.by_priority()
-cols = st.columns(4)
-for col, priority in zip(cols, Priority):
-    col.metric(f"{BADGE[priority]} {priority.value}", len(groups[priority]))
+for col, priority in zip(st.columns(4), Priority):
+    slug, color, icon, meaning = BAND[priority]
+    with col.container(border=True, key=f"band-{slug}"):
+        st.metric(f":{color}[:material/{icon}:] {priority.value}", len(groups[priority]))
+        st.caption(meaning)
+st.caption(":material/info: " + DISCLAIMER)
 
 
 def correction_form(result) -> None:
     mid = result.message.message_id
-    with st.popover("Correct priority or deadline"), st.form(f"fix-{mid}", border=False):
+    with st.popover("Correct", icon=":material/edit:"), st.form(f"fix-{mid}", border=False):
         c1, c2, c3 = st.columns([2, 2, 1])
         options = [p.value for p in Priority]
         new_priority = c1.selectbox("Priority", options, index=options.index(result.priority.value), key=f"p-{mid}")
@@ -283,66 +327,92 @@ def correction_form(result) -> None:
                 fix["deadline"] = datetime.combine(new_date, new_time, tzinfo=HKT)
             state.corrections[mid] = fix
             st.rerun()
-    if mid in state.corrections and st.button("Undo correction", key=f"undo-{mid}"):
-        del state.corrections[mid]
-        st.rerun()
 
 
 def show_result(result) -> None:
     m, x = result.message, result.extraction
-    flags = (" · OVERDUE" if result.overdue else "") + (" · corrected" if result.corrected else "")
-    title = f"{BADGE[result.priority]} [{m.message_id}] {m.subject or '(no subject)'}{flags}"
-    with st.expander(title, expanded=result.priority in (Priority.REVIEW, Priority.HIGH)):
+    slug, color, _, _ = BAND[result.priority]
+    badges = [f":gray-badge[{md(m.message_id)}]"]
+    if result.overdue:
+        badges.append(":red-badge[:material/alarm: Overdue]")
+    if result.corrected:
+        badges.append(":blue-badge[:material/edit: Corrected by you]")
+    with st.container(border=True, key=f"card-{slug}-{anchor(m.message_id)}"):
+        st.markdown(f"**{md(m.subject or '(no subject)')}** &nbsp;" + " ".join(badges))
         for reason in result.reasons:
-            st.markdown(f"**Why:** {reason}")
+            st.markdown(f":{color}[**Why:**] {md(reason)}")
         for note in result.notes:
-            st.warning(note, icon="🧵")
+            st.warning(note, icon=":material/forum:")
         for note in result.assumptions:
-            st.caption(f"Assumption: {note}")
+            st.caption(f":material/help: Assumption: {note}")
         if x is not None and result.priority is not Priority.REVIEW:
+            esc = html.escape
+            parts = []
+            facts = []
             if x.action_text:
-                st.markdown(f"**Action:** {x.action_text}")
+                facts.append(f'<div><p class="cm-label">Action</p><p class="cm-value">{esc(x.action_text)}</p></div>')
             if result.deadline:
-                st.markdown(f"**Deadline:** {format_dt(result.deadline, result.deadline_has_time)}")
+                facts.append(f'<div><p class="cm-label">Deadline</p><p class="cm-value"><b>'
+                             f'{esc(format_dt(result.deadline, result.deadline_has_time))}</b> · '
+                             f'{until(result.deadline, now)}</p></div>')
+            if facts:
+                parts.append(f'<div class="cm-facts">{"".join(facts)}</div>')
             if x.source == "model":
-                st.markdown(f"**Summary:** {x.summary}")
+                parts.append(f'<p class="cm-label">Summary</p><p class="cm-value">{esc(x.summary)}</p>')
             else:
-                st.markdown("**Key sentences** (copied from the email by the rules, no AI summary):")
-            for q in x.quotes:
-                st.markdown(f"> “{q}”  \n> — [{m.message_id}](#{anchor(m.message_id)})")
+                parts.append('<p class="cm-label">Key sentences (copied by the rules, no AI summary)</p>')
+            source = f'<a class="cm-src" href="#{anchor(m.message_id)}">{esc(m.message_id)}</a>'
+            parts += [f'<blockquote class="cm-quote">“{esc(q)}” {source}</blockquote>' for q in x.quotes]
+            st.html("".join(parts))
         else:
-            st.markdown("No summary is shown for messages that need review. The original email:")
-            with st.container(border=True):
-                st.text(m.body if len(m.body) <= 1200 else m.body[:1200] + " …")
+            st.html('<p class="cm-label">Original email (no summary is shown for messages that need review)</p>')
+            body = m.body if len(m.body) <= 1200 else m.body[:1200] + " …"
+            st.html(f'<div class="cm-original">{html.escape(body)}</div>')
             if len(m.body) > 1200:
                 st.markdown(f"[Read the whole email](#{anchor(m.message_id)})")
-        correction_form(result)
+        left, right, _ = st.columns([1, 1, 4])
+        with left:
+            correction_form(result)
+        if m.message_id in state.corrections and right.button("Undo", key=f"undo-{m.message_id}",
+                                                              icon=":material/undo:"):
+            del state.corrections[m.message_id]
+            st.rerun()
 
 
 for priority in Priority:
-    if groups[priority]:
-        st.subheader(f"{BADGE[priority]} {priority.value}")
+    if not groups[priority]:
+        continue
+    slug, color, icon, meaning = BAND[priority]
+    st.subheader(f":{color}[:material/{icon}:] {priority.value} :{color}-badge[{len(groups[priority])}]",
+                 anchor=slug)
+    if priority is Priority.LOW:
+        with st.expander(f"Show {len(groups[priority])} low-priority messages"):
+            for result in groups[priority]:
+                show_result(result)
+    else:
         for result in groups[priority]:
             show_result(result)
 
+st.subheader(":material/download: Export", anchor="export")
 left, right = st.columns(2)
 left.download_button(
-    "Export digest (.txt)", render_text(run, now), file_name="campusmail_digest.txt", mime="text/plain",
+    "Digest (.txt)", render_text(run, now), file_name="campusmail_digest.txt", mime="text/plain",
+    icon=":material/description:", width="stretch",
 )
 right.download_button(
-    "Add deadlines to calendar (.ics)", render_ics(run, now), file_name="campusmail_deadlines.ics",
-    mime="text/calendar", help="High and Medium items with an upcoming, checked deadline. "
+    "Deadlines for your calendar (.ics)", render_ics(run, now), file_name="campusmail_deadlines.ics",
+    mime="text/calendar", icon=":material/event:", width="stretch",
+    help="High and Medium items with an upcoming, checked deadline. "
     "Items that need review are left out because their dates could not be verified.",
 )
 
 st.divider()
-st.subheader("Original messages", anchor="originals")
+st.subheader(":material/mail: Original messages", anchor="originals")
 for m in state.messages:
-    st.markdown(f"##### {m.message_id}: {m.subject or '(no subject)'}")
     st.html(f'<span id="{anchor(m.message_id)}"></span>')
     received = m.received.strftime("%a %d %b %Y %H:%M") if m.received else "unknown"
     thread = f" · thread {m.thread_id}" if m.thread_id and len(m.thread_id) <= 12 else ""
-    with st.expander(f"Received {received}{thread}", expanded=False):
+    with st.expander(f"**{md(m.message_id)}** · {md(m.subject or '(no subject)')} · {received}{md(thread)}"):
         if m.link:
             st.markdown(f"[Open in your mailbox]({m.link})")
         for note in m.notes:

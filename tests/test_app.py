@@ -30,7 +30,9 @@ def test_rules_run_correction_and_export(app):
     next(s for s in app.selectbox if s.key == "p-m10").set_value("High")
     next(b for b in app.button if b.form_id == "fix-m10").click().run()
     assert [m.value for m in app.metric] == ["5", "4", "2", "2"]
-    assert any("m10" in e.label and "corrected" in e.label for e in app.expander)
+    assert any("m10" in md.value and "Corrected by you" in md.value for md in app.markdown)
+    # Email text is shown literally, never interpreted as Markdown.
+    assert not app.exception
 
 
 def test_cloud_engine_needs_key_and_consent(app, monkeypatch):
@@ -67,3 +69,19 @@ def test_mail_setup_is_asked_once_then_sign_in_is_one_click(app, tmp_path, monke
     button(app, "Sign in with Microsoft").click().run()
     assert any("not a Microsoft app ID" in e.value for e in app.error)
     assert mailbox.ms_client_id() == ("", "")
+
+
+def test_email_text_is_escaped_for_markdown():
+    from campusmail.ui import md
+    escaped = md("**Lab** [click](http://x) :red[hi] $5")
+    assert escaped == r"\*\*Lab\*\* \[click\]\(http\://x\) \:red\[hi\] \$5"
+
+
+def test_time_until_deadline():
+    from datetime import timedelta
+
+    from campusmail.ui import until
+    from conftest import NOW
+    assert until(NOW + timedelta(hours=31), NOW) == "in 31 h"
+    assert until(NOW + timedelta(days=5, hours=13), NOW) == "in 6 days"
+    assert until(NOW - timedelta(minutes=5), NOW) == "overdue"
