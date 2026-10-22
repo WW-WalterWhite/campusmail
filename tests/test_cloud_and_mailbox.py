@@ -185,3 +185,12 @@ def test_device_flow_wait_is_capped():
     import time
     assert mailbox.outlook_finish_sign_in(app, {"expires_at": time.time() + 900}) == "t"
     assert app.flow["expires_at"] <= time.time() + 91
+
+
+def test_calendar_event_links_to_the_mailbox():
+    from campusmail.digest import render_ics
+    msg = mailbox._message("o01", "2026-09-30T02:00:00Z", "COMP3297 Lab 4",
+                           "Please submit the Lab 4 report by 17:00 on 1 October.", False, None,
+                           "https://outlook.office365.com/owa/?ItemID=abc")
+    run = pipeline.run([msg], COURSES, NOW)
+    assert "URL:https://outlook.office365.com/owa/?ItemID=abc" in render_ics(run, NOW).replace("\r\n ", "")
