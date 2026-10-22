@@ -4,7 +4,8 @@ import subprocess
 import sys
 
 from campusmail import pipeline
-from campusmail.digest import DISCLAIMER, render_text
+from campusmail.digest import DISCLAIMER, render_ics, render_text
+from campusmail.models import Priority
 from campusmail.importer import load_csv, parse_received
 from conftest import ROOT
 
@@ -55,3 +56,20 @@ def test_bundled_sets_pass_the_safety_gate(tmp_path):
                        capture_output=True, text=True, check=True)
         report = json.loads(out.with_suffix(".json").read_text())
         assert report["safety_gate"] == "pass", name
+
+
+def test_calendar_has_only_checked_upcoming_deadlines():
+    run, now = sample_run()
+    ics = render_ics(run, now)
+    assert ics.startswith("BEGIN:VCALENDAR\r\n") and ics.endswith("END:VCALENDAR\r\n")
+    assert all(len(line.encode("utf-8")) <= 75 for line in ics.split("\r\n"))
+    expected = [r for r in run.results if r.priority in (Priority.HIGH, Priority.MEDIUM)
+                and r.deadline is not None and not r.overdue]
+    assert expected and ics.count("BEGIN:VEVENT") == len(expected)
+    review_subjects = [r.message.subject for r in run.results if r.priority is Priority.REVIEW]
+    unfolded = ics.replace("\r\n ", "")
+    assert not any(s and s in unfolded for s in review_subjects)
+    # Lab 4 is due 22 Oct 17:00 HKT: the event ends then (09:00 UTC) with a reminder a day before.
+    assert "DTEND:20261022T090000Z" in ics and "TRIGGER:-P1D" in ics
+    # The moved ECON1210 tutorial starts at 14:30 HKT (06:30 UTC).
+    assert "DTSTART:20261022T063000Z" in ics

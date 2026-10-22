@@ -12,7 +12,7 @@ import streamlit as st
 
 from campusmail import pipeline
 from campusmail.dates import HKT, format_dt
-from campusmail.digest import DISCLAIMER, render_text
+from campusmail.digest import DISCLAIMER, render_ics, render_text
 from campusmail.importer import CSVImportError, load_csv, parse_course_list, parse_received
 from campusmail.llm import DEFAULT_MODEL, OllamaClient
 from campusmail.models import Priority
@@ -210,8 +210,14 @@ for priority in Priority:
         for result in groups[priority]:
             show_result(result)
 
-st.download_button(
+left, right = st.columns(2)
+left.download_button(
     "Export digest (.txt)", render_text(run, now), file_name="campusmail_digest.txt", mime="text/plain",
+)
+right.download_button(
+    "Add deadlines to calendar (.ics)", render_ics(run, now), file_name="campusmail_deadlines.ics",
+    mime="text/calendar", help="High and Medium items with an upcoming, checked deadline. "
+    "Items that need review are left out because their dates could not be verified.",
 )
 
 st.divider()

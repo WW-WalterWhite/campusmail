@@ -146,6 +146,14 @@ You can also type a different model name in the sidebar.
 
 ## Evaluation
 
+**Quickest way to get the numbers for the status sheet:** with Ollama running, double-click
+`benchmark.bat` (Windows) or run `./benchmark.sh`. It runs the rules baseline and Qwen3 on the
+sample, dev and challenge sets and saves `results/benchmark_<time>.md` with a ready-to-paste
+results table, the mismatches and your setup (10-20 minutes on a laptop; `--quick` does the
+sample inbox only).
+
+To run one set at a time:
+
 ```bash
 python eval/evaluate.py                                   # rules baseline on the sample inbox
 python eval/evaluate.py --set dev                         # the 40-message development set
