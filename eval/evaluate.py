@@ -146,6 +146,63 @@ def print_report(report: dict, results: dict, labels: dict) -> None:
             print(f"  {m}: expected {labels[m]['expected_priority']}, got {r.priority.value} ({'; '.join(r.reasons)})")
 
 
+def load_labels(labels_path: Path) -> dict[str, dict]:
+    with labels_path.open(newline="", encoding="utf-8") as f:
+        labels = {row["message_id"]: {k: (v or "").strip() for k, v in row.items()} for row in csv.DictReader(f)}
+    bad = {row["expected_priority"] for row in labels.values()} - set(ALL)
+    if bad:
+        raise SystemExit(f"Unknown label(s): {', '.join(sorted(bad))}. Use one of: {', '.join(ALL)}")
+    return labels
+
+
+def evaluate_set(inbox: Path, labels_path: Path, profile: dict, client, repeat: int = 1, log=print):
+    """Run the pipeline `repeat` times on one labelled set. Returns (report, last run, labels)."""
+    now = parse_received(profile["reference_time"])
+    messages = load_csv(inbox.read_bytes(), max_messages=None)  # the 30-message cap is a UI limit
+    labels = load_labels(labels_path)
+    runs = []
+    for i in range(max(1, repeat)):
+        run = pipeline.run(messages, profile["courses"], now, client)
+        runs.append(run)
+        if repeat > 1:
+            log(f"run {i + 1}/{repeat}: {run.seconds:.1f} s")
+    run = runs[-1]
+    results = {r.message.message_id: r for r in run.results}
+    report = evaluate(labels, results)
+
+    per_message = [t for r in runs for t in r.timings.values()]
+    report["timing"] = {
+        "runs": len(runs),
+        "run_seconds": [round(r.seconds, 2) for r in runs],
+        "median_run_seconds": round(statistics.median(r.seconds for r in runs), 2),
+        "slowest_run_seconds": round(max(r.seconds for r in runs), 2),
+        "median_message_seconds": round(statistics.median(per_message), 2) if per_message else None,
+        "slowest_message_seconds": round(max(per_message), 2) if per_message else None,
+    }
+    report["setup"] = {
+        "engine": run.model_name, "mode": run.mode, "notice": run.notice, "prompt_version": PROMPT_VERSION,
+        "inbox": inbox.name, "labels": labels_path.name, "python": platform.python_version(),
+        "platform": platform.platform(), "date": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+    }
+    return report, run, labels
+
+
+def write_outputs(prefix: Path, report: dict, run, labels: dict) -> None:
+    prefix.parent.mkdir(parents=True, exist_ok=True)
+    with prefix.with_suffix(".csv").open("w", newline="", encoding="utf-8") as f:
+        writer = csv.writer(f)
+        writer.writerow(["message_id", "expected", "predicted", "expected_deadline", "deadline",
+                         "reasons", "summary", "engine", "seconds"])
+        for r in run.results:
+            m = r.message.message_id
+            writer.writerow([m, labels.get(m, {}).get("expected_priority", ""), r.priority.value,
+                             labels.get(m, {}).get("expected_deadline", ""),
+                             r.deadline.strftime("%Y-%m-%dT%H:%M") if r.deadline else "",
+                             " | ".join(r.reasons), r.extraction.summary if r.extraction else "",
+                             run.model_name, f"{run.timings.get(m, 0):.2f}"])
+    prefix.with_suffix(".json").write_text(json.dumps(report, indent=2), encoding="utf-8")
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--set", choices=list(SETS), default="sample", help="a bundled dataset")
@@ -167,59 +224,18 @@ def main() -> None:
     inbox = args.inbox or ROOT / SETS[args.set][0]
     labels_path = args.labels or ROOT / SETS[args.set][1]
     profile = json.loads(args.profile.read_text(encoding="utf-8"))
-    now = parse_received(profile["reference_time"])
-    messages = load_csv(inbox.read_bytes(), max_messages=None)  # the 30-message cap is a UI limit
-    with labels_path.open(newline="", encoding="utf-8") as f:
-        labels = {row["message_id"]: {k: (v or "").strip() for k, v in row.items()} for row in csv.DictReader(f)}
-    bad = {row["expected_priority"] for row in labels.values()} - set(ALL)
-    if bad:
-        raise SystemExit(f"Unknown label(s): {', '.join(sorted(bad))}. Use one of: {', '.join(ALL)}")
-
     client = make_client(args)
-    runs = []
-    for i in range(max(1, args.repeat)):
-        run = pipeline.run(messages, profile["courses"], now, client)
-        runs.append(run)
-        if args.repeat > 1:
-            print(f"run {i + 1}/{args.repeat}: {run.seconds:.1f} s")
-    run = runs[-1]
+    report, run, labels = evaluate_set(inbox, labels_path, profile, client, args.repeat)
     if run.notice:
         print(f"NOTICE: {run.notice}")
     results = {r.message.message_id: r for r in run.results}
-    report = evaluate(labels, results)
-
-    per_message = [t for r in runs for t in r.timings.values()]
-    report["timing"] = {
-        "runs": len(runs),
-        "run_seconds": [round(r.seconds, 2) for r in runs],
-        "median_run_seconds": round(statistics.median(r.seconds for r in runs), 2),
-        "slowest_run_seconds": round(max(r.seconds for r in runs), 2),
-        "median_message_seconds": round(statistics.median(per_message), 2) if per_message else None,
-        "slowest_message_seconds": round(max(per_message), 2) if per_message else None,
-    }
-    report["setup"] = {
-        "engine": run.model_name, "mode": run.mode, "prompt_version": PROMPT_VERSION,
-        "inbox": inbox.name, "labels": labels_path.name, "python": platform.python_version(),
-        "platform": platform.platform(), "date": datetime.now(timezone.utc).isoformat(timespec="seconds"),
-    }
 
     print(f"Engine: {run.model_name}   set: {inbox.name}   messages: {report['n']}   "
-          f"run time (median of {len(runs)}): {report['timing']['median_run_seconds']} s")
+          f"run time (median of {report['timing']['runs']}): {report['timing']['median_run_seconds']} s")
     print_report(report, results, labels)
 
     if args.out:
-        args.out.parent.mkdir(parents=True, exist_ok=True)
-        with args.out.with_suffix(".csv").open("w", newline="", encoding="utf-8") as f:
-            writer = csv.writer(f)
-            writer.writerow(["message_id", "expected", "predicted", "expected_deadline", "deadline",
-                             "reasons", "summary", "engine", "seconds"])
-            for m, r in results.items():
-                writer.writerow([m, labels.get(m, {}).get("expected_priority", ""), r.priority.value,
-                                 labels.get(m, {}).get("expected_deadline", ""),
-                                 r.deadline.strftime("%Y-%m-%dT%H:%M") if r.deadline else "",
-                                 " | ".join(r.reasons), r.extraction.summary if r.extraction else "",
-                                 run.model_name, f"{run.timings.get(m, 0):.2f}"])
-        args.out.with_suffix(".json").write_text(json.dumps(report, indent=2), encoding="utf-8")
+        write_outputs(args.out, report, run, labels)
         print(f"\nResults written to {args.out.with_suffix('.csv')} and {args.out.with_suffix('.json')}")
 
 
