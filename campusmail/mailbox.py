@@ -35,6 +35,13 @@ GOOGLE_CLIENT_FILE = Path(os.environ.get("CAMPUSMAIL_GOOGLE_CLIENT_FILE", "secre
 TIMEOUT = 30
 
 
+# University tenants such as HKU usually only let IT-approved apps read mail; the browser then says
+# "Need admin approval" or "You don't have access", and the app only sees a declined or expired code.
+ORG_BLOCK_HINT = ("If the browser said you need admin approval or don't have access, your university only "
+                  "allows approved apps to read its mail. Use Gmail or a personal Outlook.com account instead "
+                  "(see README), or ask IT to approve the app.")
+
+
 class MailboxError(RuntimeError):
     """Sign-in or fetching failed; the message is safe to show to the user."""
 
@@ -171,7 +178,8 @@ def outlook_finish_sign_in(app, flow) -> str:
     flow["expires_at"] = min(flow.get("expires_at", float("inf")), time.time() + 90)
     result = app.acquire_token_by_device_flow(flow)
     if "access_token" not in result:
-        raise MailboxError(f"Microsoft sign-in failed: {result.get('error_description', result.get('error'))}")
+        raise MailboxError(f"Microsoft sign-in failed: {result.get('error_description', result.get('error'))} "
+                           + ORG_BLOCK_HINT)
     return result["access_token"]
 
 

@@ -158,24 +158,37 @@ Each team needs to register the app once with Microsoft and/or Google. It is fre
 5. In CampusMail press **Sign in with Microsoft**, open the link shown, enter the code, sign in,
    then press **I have signed in: fetch mail**.
 
-**HKU accounts:** if sign-in says the app *needs admin approval*, the university only allows
-approved apps to read mail. You can then use a personal Outlook.com account for the demo, or ask
-ITS for consent. To limit sign-in to one organisation, set `CAMPUSMAIL_MS_TENANT` to its tenant
-ID (default `common`).
+**HKU accounts:** HKU's Microsoft 365 only lets IT-approved apps read university mail, and
+students usually cannot register apps in the HKU directory. If you see *Need admin approval*,
+*You don't have access* or an `AADSTS` error, use **Gmail** (below) or a personal Outlook.com
+account (register the app while signed in with that account), or ask ITS for consent. To limit
+sign-in to one organisation, set `CAMPUSMAIL_MS_TENANT` to its tenant ID (default `common`).
 
 ### Gmail
 
-1. Go to <https://console.cloud.google.com>, create a project, and enable the **Gmail API**
-   (APIs & Services → Library).
-2. **OAuth consent screen**: User type *External*, keep it in *Testing*, and add each team
-   member's Gmail address under **Test users** (only test users can sign in).
-3. **Credentials** → Create credentials → **OAuth client ID** → Application type *Desktop app*.
-   Download the JSON file and save it as `secrets/google_client_secret.json` in the CampusMail
-   folder (`secrets/` is git-ignored; never commit it). Another location can be set with
+Use a personal Gmail account. Your HKU course mail stays in Outlook, so for a demo send a few
+course-style test emails to that Gmail address first (for example the bodies from
+`data/sample_inbox.csv`); this also keeps classmates' real messages out of recordings.
+
+1. Go to <https://console.cloud.google.com>, sign in with the Gmail account, and create a project
+   (e.g. `campusmail`). Open **APIs & Services → Library**, search for **Gmail API**, and press
+   **Enable**.
+2. Open **Google Auth Platform** (older consoles call it *OAuth consent screen*) and press
+   **Get started**: app name `CampusMail`, your email as support and contact address, audience
+   **External**. Then under **Audience**, leave the app in **Testing** and add each team member's
+   Gmail address under **Test users** (only test users can sign in).
+3. Under **Clients** (or **Credentials → Create credentials → OAuth client ID**), create a client
+   of type **Desktop app**. Download the JSON file and save it as
+   `secrets/google_client_secret.json` in the CampusMail folder (create the `secrets` folder;
+   it is git-ignored, never commit it). Another location can be set with
    `CAMPUSMAIL_GOOGLE_CLIENT_FILE`.
-4. In CampusMail press **Sign in with Google**. A browser tab opens; Google warns that the app is
-   unverified (expected for a testing app): choose *Continue*, allow read access, then return to
-   CampusMail.
+4. Start CampusMail, open **Import from Outlook or Gmail**, choose **Gmail** and press
+   **Sign in with Google**. A browser tab opens. Google says the app is not verified, which is
+   expected for a testing app: choose **Continue**, tick the read-only Gmail permission, and
+   return to CampusMail.
+
+If Google says *Access blocked: CampusMail has not completed the Google verification process*,
+the account you signed in with is not on the **Test users** list (step 2).
 
 ## How it works
 
