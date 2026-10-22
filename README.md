@@ -64,7 +64,7 @@ Your browser opens at <http://localhost:8501>.
    - Each item shows **Why** (the rule that placed it), the summary, and quotations linked to the
      original message at the bottom of the page.
 5. Open any item and use **Apply correction** to change its priority or deadline; the list and
-   the digest update immediately. **Export digest (.txt)** saves a plain-text digest.
+   the digest update immediately. **Export digest (.txt)** saves a plain-text digest, and **Add deadlines to calendar (.ics)** makes calendar events for High and Medium deadlines (review items are left out).
 6. **Clear session** forgets the inbox, results and corrections.
 
 The expected labels for the sample inbox are in `data/sample_labels.csv`. With the rules
