@@ -42,3 +42,28 @@ def test_cloud_engine_needs_key_and_consent(app, monkeypatch):
     assert button(app, "Sort and summarize").disabled  # still needs consent
     next(c for c in app.checkbox if c.label.startswith("I understand")).check().run()
     assert not button(app, "Sort and summarize").disabled
+
+
+def test_mail_setup_is_asked_once_then_sign_in_is_one_click(app, tmp_path, monkeypatch):
+    from campusmail import mailbox
+    monkeypatch.setattr(mailbox, "LOCAL_DIR", tmp_path / "secrets")
+    monkeypatch.setattr(mailbox, "TEAM_DIR", tmp_path / "team_setup")
+    monkeypatch.delenv("CAMPUSMAIL_GOOGLE_CLIENT_FILE", raising=False)
+    monkeypatch.delenv("CAMPUSMAIL_MS_CLIENT_ID", raising=False)
+    account = next(r for r in app.radio if r.label == "Account")
+    account.set_value("Gmail").run()
+    assert not app.exception
+    assert not any(b.label == "Sign in with Google" for b in app.button)
+    assert any("One-time setup" in m.value for m in app.markdown)
+
+    mailbox.save_google_client(b'{"installed": {"client_id": "123-abc.apps.googleusercontent.com", "client_secret": "s"}}')
+    app.run()
+    assert any(b.label == "Sign in with Google" for b in app.button)
+    assert any("saved on this computer" in c.value for c in app.caption)
+
+    account.set_value("Outlook / HKU (Microsoft 365)").run()
+    assert button(app, "Sign in with Microsoft").disabled  # no app ID yet
+    next(t for t in app.text_input if t.label == "Microsoft app ID").input("not-an-id").run()
+    button(app, "Sign in with Microsoft").click().run()
+    assert any("not a Microsoft app ID" in e.value for e in app.error)
+    assert mailbox.ms_client_id() == ("", "")

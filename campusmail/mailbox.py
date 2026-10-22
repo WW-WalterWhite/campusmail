@@ -2,15 +2,22 @@
 
 - Only read permissions are requested (Microsoft Graph `Mail.Read`, Gmail `gmail.readonly`),
   so CampusMail cannot send, delete or change mail even if it tried.
-- Tokens and messages live in memory for the current session only; nothing is written to disk.
+- Tokens and messages live in memory for the current session only and are never written to disk.
+  The only thing saved is the app's own registration (the Google client file or the Microsoft
+  app ID), so that sign-in is a single click after the one-time setup.
 - Fetched messages go through the same checks as CSV rows (length, English, empty body).
 
-Setup (an app registration with Microsoft and/or Google) is described in the README.
+Where the registration is looked up, first match wins:
+1. environment variables (CAMPUSMAIL_GOOGLE_CLIENT_FILE, CAMPUSMAIL_MS_CLIENT_ID);
+2. this computer's `secrets/` folder, written by the in-app setup (git-ignored);
+3. `team_setup/`, which a team may commit to its private repository so members skip the setup.
+Registering the app with Google or Microsoft is described in the README.
 """
 
 from __future__ import annotations
 
 import base64
+import json
 import os
 import re
 import time
@@ -28,10 +35,14 @@ GRAPH = "https://graph.microsoft.com/v1.0"
 GMAIL = "https://gmail.googleapis.com/gmail/v1/users/me"
 MS_SCOPES = ["Mail.Read"]
 GMAIL_SCOPES = ["https://www.googleapis.com/auth/gmail.readonly"]
-MS_CLIENT_ID = os.environ.get("CAMPUSMAIL_MS_CLIENT_ID", "")
 # "organizations" = work/school accounts such as HKU; "common" also allows personal Outlook.com.
 MS_AUTHORITY = "https://login.microsoftonline.com/" + os.environ.get("CAMPUSMAIL_MS_TENANT", "common")
-GOOGLE_CLIENT_FILE = Path(os.environ.get("CAMPUSMAIL_GOOGLE_CLIENT_FILE", "secrets/google_client_secret.json"))
+ROOT = Path(__file__).resolve().parent.parent
+LOCAL_DIR = ROOT / "secrets"
+TEAM_DIR = ROOT / "team_setup"
+GOOGLE_FILE_NAME = "google_client.json"
+MS_FILE_NAME = "microsoft_client_id.txt"
+GUID = re.compile(r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$", re.I)
 TIMEOUT = 30
 
 
@@ -44,6 +55,86 @@ ORG_BLOCK_HINT = ("If the browser said you need admin approval or don't have acc
 
 class MailboxError(RuntimeError):
     """Sign-in or fetching failed; the message is safe to show to the user."""
+
+
+# ---------------------------------------------------------------- one-time app setup
+
+def google_client_file() -> tuple[Path, str] | None:
+    """The Google client file to use and where it came from ("environment", "this computer", "team")."""
+    env = os.environ.get("CAMPUSMAIL_GOOGLE_CLIENT_FILE")
+    candidates = ([(Path(env), "environment")] if env else []) + [
+        (LOCAL_DIR / GOOGLE_FILE_NAME, "this computer"),
+        (LOCAL_DIR / "google_client_secret.json", "this computer"),  # the name earlier README steps used
+        (TEAM_DIR / GOOGLE_FILE_NAME, "team"),
+    ]
+    return next(((path, where) for path, where in candidates if path.is_file()), None)
+
+
+def parse_google_client(data: bytes | str) -> dict:
+    """Check that `data` is the JSON Google gives for a *Desktop app* OAuth client."""
+    try:
+        info = json.loads(data)
+    except (ValueError, UnicodeDecodeError) as exc:
+        raise MailboxError("That file is not the JSON file Google lets you download for an OAuth client.") from exc
+    if not isinstance(info, dict):
+        raise MailboxError("That file is not a Google OAuth client file.")
+    if "web" in info:
+        raise MailboxError("This client is of type 'Web application'. In Google Cloud, create an OAuth client "
+                           "of type 'Desktop app' and use its file instead.")
+    installed = info.get("installed")
+    if not isinstance(installed, dict) or not installed.get("client_id") or not installed.get("client_secret"):
+        raise MailboxError("That file has no Desktop app client in it. Download the JSON of a 'Desktop app' "
+                           "OAuth client from Google Cloud.")
+    installed.setdefault("auth_uri", "https://accounts.google.com/o/oauth2/auth")
+    installed.setdefault("token_uri", "https://oauth2.googleapis.com/token")
+    return info
+
+
+def save_google_client(data: bytes | str) -> str:
+    """Validate and save the client file on this computer. Returns the client ID."""
+    info = parse_google_client(data)
+    LOCAL_DIR.mkdir(exist_ok=True)
+    (LOCAL_DIR / GOOGLE_FILE_NAME).write_text(json.dumps(info, indent=2), encoding="utf-8")
+    return info["installed"]["client_id"]
+
+
+def google_client_id(path: Path) -> str:
+    try:
+        return parse_google_client(path.read_bytes())["installed"]["client_id"]
+    except (OSError, MailboxError):
+        return ""
+
+
+def forget_google_client() -> None:
+    """Remove this computer's saved client files (a team file in team_setup/ is left alone)."""
+    for name in (GOOGLE_FILE_NAME, "google_client_secret.json"):
+        (LOCAL_DIR / name).unlink(missing_ok=True)
+
+
+def ms_client_id() -> tuple[str, str]:
+    """The Microsoft app ID and where it came from, or ("", "")."""
+    if os.environ.get("CAMPUSMAIL_MS_CLIENT_ID"):
+        return os.environ["CAMPUSMAIL_MS_CLIENT_ID"].strip(), "environment"
+    for path, where in ((LOCAL_DIR / MS_FILE_NAME, "this computer"), (TEAM_DIR / MS_FILE_NAME, "team")):
+        if path.is_file():
+            value = path.read_text(encoding="utf-8").strip()
+            if value:
+                return value, where
+    return "", ""
+
+
+def forget_ms_client_id() -> None:
+    (LOCAL_DIR / MS_FILE_NAME).unlink(missing_ok=True)
+
+
+def save_ms_client_id(value: str) -> str:
+    value = value.strip()
+    if not GUID.match(value):
+        raise MailboxError("That is not a Microsoft app ID. Copy the 'Application (client) ID' from the app's "
+                           "Overview page; it looks like 1a2b3c4d-1234-5678-9abc-1234567890ab.")
+    LOCAL_DIR.mkdir(exist_ok=True)
+    (LOCAL_DIR / MS_FILE_NAME).write_text(value + "\n", encoding="utf-8")
+    return value
 
 
 # ---------------------------------------------------------------- text cleanup
@@ -159,9 +250,12 @@ def outlook_start_sign_in(client_id: str = "", authority: str = MS_AUTHORITY):
     """Begin the device-code sign-in. Returns (msal app, flow); show flow["message"] to the user."""
     import msal  # imported here so the rest of the app works without the package
 
-    client_id = client_id or MS_CLIENT_ID
+    client_id = (client_id or ms_client_id()[0]).strip()
     if not client_id:
-        raise MailboxError("No Microsoft app ID. Set CAMPUSMAIL_MS_CLIENT_ID or enter it in the sidebar (see README).")
+        raise MailboxError("No Microsoft app ID yet. Paste it in the sidebar once (see README).")
+    if not GUID.match(client_id):
+        raise MailboxError("That is not a Microsoft app ID. Copy the 'Application (client) ID' from the app's "
+                           "Overview page.")
     app = msal.PublicClientApplication(client_id, authority=authority, token_cache=msal.TokenCache())
     flow = app.initiate_device_flow(scopes=MS_SCOPES)
     if "user_code" not in flow:
@@ -206,10 +300,16 @@ def outlook_fetch(token: str, limit: int = MAX_MESSAGES, days: int = 14, session
 
 # ---------------------------------------------------------------- Gmail
 
-def gmail_sign_in(client_file: Path = GOOGLE_CLIENT_FILE) -> str:
+def gmail_sign_in(client_file: Path | str | None = None) -> str:
     """Opens Google's sign-in page in the browser and waits for consent; returns an access token."""
     from google_auth_oauthlib.flow import InstalledAppFlow
 
+    if client_file is None:
+        found = google_client_file()
+        if found is None:
+            raise MailboxError("Gmail is not set up on this computer yet. Add the Google client file in the sidebar "
+                               "(see README).")
+        client_file = found[0]
     if not Path(client_file).exists():
         raise MailboxError(f"Google client file not found at {client_file}. See the README for how to create it.")
     flow = InstalledAppFlow.from_client_secrets_file(str(client_file), scopes=GMAIL_SCOPES)

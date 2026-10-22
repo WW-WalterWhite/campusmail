@@ -194,3 +194,59 @@ def test_calendar_event_links_to_the_mailbox():
                            "https://outlook.office365.com/owa/?ItemID=abc")
     run = pipeline.run([msg], COURSES, NOW)
     assert "URL:https://outlook.office365.com/owa/?ItemID=abc" in render_ics(run, NOW).replace("\r\n ", "")
+
+
+# ---------------------------------------------------------------- one-time sign-in setup
+
+DESKTOP_CLIENT = {"installed": {"client_id": "123-abc.apps.googleusercontent.com", "client_secret": "s",
+                                "auth_uri": "https://accounts.google.com/o/oauth2/auth",
+                                "token_uri": "https://oauth2.googleapis.com/token"}}
+APP_ID = "1a2b3c4d-1234-5678-9abc-1234567890ab"
+
+
+@pytest.fixture
+def setup_dirs(tmp_path, monkeypatch):
+    monkeypatch.setattr(mailbox, "LOCAL_DIR", tmp_path / "secrets")
+    monkeypatch.setattr(mailbox, "TEAM_DIR", tmp_path / "team_setup")
+    monkeypatch.delenv("CAMPUSMAIL_GOOGLE_CLIENT_FILE", raising=False)
+    monkeypatch.delenv("CAMPUSMAIL_MS_CLIENT_ID", raising=False)
+    return tmp_path
+
+
+def test_google_client_is_saved_once_and_found_again(setup_dirs):
+    assert mailbox.google_client_file() is None
+    assert mailbox.save_google_client(json.dumps(DESKTOP_CLIENT).encode()) == "123-abc.apps.googleusercontent.com"
+    path, where = mailbox.google_client_file()
+    assert where == "this computer" and mailbox.google_client_id(path).startswith("123-abc")
+    mailbox.forget_google_client()
+    assert mailbox.google_client_file() is None
+
+
+def test_team_setup_is_used_when_nothing_is_saved_locally(setup_dirs):
+    (setup_dirs / "team_setup").mkdir()
+    (setup_dirs / "team_setup" / "google_client.json").write_text(json.dumps(DESKTOP_CLIENT))
+    (setup_dirs / "team_setup" / "microsoft_client_id.txt").write_text(APP_ID + "\n")
+    assert mailbox.google_client_file()[1] == "team"
+    assert mailbox.ms_client_id() == (APP_ID, "team")
+    mailbox.save_ms_client_id("ffffffff-1234-5678-9abc-1234567890ab")
+    assert mailbox.ms_client_id()[1] == "this computer"  # a personal choice wins over the team's
+
+
+@pytest.mark.parametrize("data,message", [
+    (b"not json", "not the JSON"),
+    (json.dumps({"web": {"client_id": "x", "client_secret": "y"}}).encode(), "Desktop app"),
+    (json.dumps({"installed": {"client_id": "x"}}).encode(), "no Desktop app client"),
+])
+def test_wrong_google_files_are_explained(setup_dirs, data, message):
+    with pytest.raises(mailbox.MailboxError, match=message):
+        mailbox.save_google_client(data)
+    assert mailbox.google_client_file() is None
+
+
+def test_microsoft_app_id_is_checked(setup_dirs):
+    with pytest.raises(mailbox.MailboxError, match="not a Microsoft app ID"):
+        mailbox.save_ms_client_id("my secret value")
+    assert mailbox.save_ms_client_id(f"  {APP_ID} ") == APP_ID
+    assert mailbox.ms_client_id() == (APP_ID, "this computer")
+    mailbox.forget_ms_client_id()
+    assert mailbox.ms_client_id() == ("", "")

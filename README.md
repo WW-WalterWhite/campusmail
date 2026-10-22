@@ -143,7 +143,12 @@ Google), so the app cannot send, delete or change mail. Tokens and messages stay
 the session; **Clear session** forgets them. Long quoted reply chains below a reply are left
 out (and labelled); everything else goes through the same checks as a CSV import.
 
-Each team needs to register the app once with Microsoft and/or Google. It is free.
+**Setup happens once.** One team member registers the app with Google (or Microsoft); it is
+free and takes about 5 minutes. After that, CampusMail asks for the downloaded file (or the app
+ID) once in the sidebar and remembers it on that computer, so signing in is one click. To spare
+teammates even that step, see [Team setup](#team-setup-optional). What cannot be automated:
+Google and Microsoft require every app that reads mail to be registered by a person, and while a
+Google app is in *Testing*, only the Gmail addresses listed as test users can sign in.
 
 ### Outlook / HKU mail (Microsoft 365)
 
@@ -152,11 +157,10 @@ Each team needs to register the app once with Microsoft and/or Google. It is fre
    personal Microsoft accounts*. Leave the redirect URI empty. Register.
 2. In the new app: **Authentication** → *Advanced settings* → **Allow public client flows: Yes** → Save.
 3. **API permissions** → Add a permission → Microsoft Graph → *Delegated* → `Mail.Read` → Add.
-4. Copy the **Application (client) ID** from the Overview page. Either paste it into the sidebar,
-   or set it before starting the app: `set CAMPUSMAIL_MS_CLIENT_ID=<id>` (Windows) /
-   `export CAMPUSMAIL_MS_CLIENT_ID=<id>` (macOS/Linux).
-5. In CampusMail press **Sign in with Microsoft**, open the link shown, enter the code, sign in,
-   then press **I have signed in: fetch mail**.
+4. Copy the **Application (client) ID** from the Overview page and paste it into the sidebar
+   (**Import from Outlook or Gmail → Outlook**). CampusMail remembers it on this computer.
+5. Press **Sign in with Microsoft**, open the link shown, enter the code, sign in, then press
+   **I have signed in: fetch mail**. Next time, only this step is needed.
 
 **HKU accounts:** HKU's Microsoft 365 only lets IT-approved apps read university mail, and
 students usually cannot register apps in the HKU directory. If you see *Need admin approval*,
@@ -178,17 +182,25 @@ course-style test emails to that Gmail address first (for example the bodies fro
    **External**. Then under **Audience**, leave the app in **Testing** and add each team member's
    Gmail address under **Test users** (only test users can sign in).
 3. Under **Clients** (or **Credentials → Create credentials → OAuth client ID**), create a client
-   of type **Desktop app**. Download the JSON file and save it as
-   `secrets/google_client_secret.json` in the CampusMail folder (create the `secrets` folder;
-   it is git-ignored, never commit it). Another location can be set with
-   `CAMPUSMAIL_GOOGLE_CLIENT_FILE`.
-4. Start CampusMail, open **Import from Outlook or Gmail**, choose **Gmail** and press
-   **Sign in with Google**. A browser tab opens. Google says the app is not verified, which is
-   expected for a testing app: choose **Continue**, tick the read-only Gmail permission, and
-   return to CampusMail.
+   of type **Desktop app** and press **Download JSON**.
+4. In CampusMail open **Import from Outlook or Gmail → Gmail** and drop that file on the upload
+   box. CampusMail checks it and saves it in its git-ignored `secrets/` folder, so you never need
+   to do this again on this computer.
+5. Press **Sign in with Google**. A browser tab opens. Google says the app is not verified, which
+   is expected for a testing app: choose **Continue**, tick the read-only Gmail permission, and
+   return to CampusMail. Next time, only this step is needed.
 
 If Google says *Access blocked: CampusMail has not completed the Google verification process*,
 the account you signed in with is not on the **Test users** list (step 2).
+
+### Team setup (optional)
+
+So that teammates (or markers given repository access) only press **Sign in**, the person who
+registered the app can put the same files in `team_setup/` and commit them:
+`team_setup/google_client.json` (the downloaded Desktop app file) and/or
+`team_setup/microsoft_client_id.txt` (the app ID on one line). **Only do this while the
+repository is private**, and add each person's Gmail as a test user. See
+[team_setup/README.md](team_setup/README.md) for what this does and does not expose.
 
 ## How it works
 
@@ -231,8 +243,8 @@ delimited untrusted data.
 | `OLLAMA_HOST` | `http://localhost:11434` | where Ollama listens |
 | `CAMPUSMAIL_TIMEOUT` | `120` | seconds to wait for one model answer (the first answer, which also loads the model, may take up to 300 s) |
 | `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `DEEPSEEK_API_KEY`, `DASHSCOPE_API_KEY`, `CAMPUSMAIL_API_KEY` | none | cloud engine keys (optional) |
-| `CAMPUSMAIL_MS_CLIENT_ID`, `CAMPUSMAIL_MS_TENANT` | none, `common` | Microsoft app registration for Outlook import |
-| `CAMPUSMAIL_GOOGLE_CLIENT_FILE` | `secrets/google_client_secret.json` | Google OAuth client file for Gmail import |
+| `CAMPUSMAIL_MS_CLIENT_ID`, `CAMPUSMAIL_MS_TENANT` | saved ID, `common` | Microsoft app registration for Outlook import (overrides the saved one) |
+| `CAMPUSMAIL_GOOGLE_CLIENT_FILE` | saved file | Google OAuth client file for Gmail import (overrides the saved one) |
 
 You can also type a different model name in the sidebar.
 

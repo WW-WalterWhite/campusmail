@@ -73,11 +73,24 @@ def mailbox_import() -> None:
         st.caption("Read-only access. CampusMail cannot send, delete or change your mail.")
         try:
             if service.startswith("Outlook"):
-                client_id = st.text_input("Microsoft app ID", value=mailbox.MS_CLIENT_ID, key="ms_client_id",
-                                          help="From your app registration; see the README.")
+                saved_id, where = mailbox.ms_client_id()
+                if saved_id:
+                    st.caption(f"Microsoft app ID …{saved_id[-6:]} (saved on {where}).")
+                    client_id = saved_id
+                else:
+                    st.markdown("**One-time setup:** paste the app's *Application (client) ID* "
+                                "([how to get it](https://github.com/WW-WalterWhite/campusmail#outlook--hku-mail-microsoft-365)). "
+                                "It is remembered on this computer.")
+                    client_id = st.text_input("Microsoft app ID", key="ms_client_id",
+                                              placeholder="1a2b3c4d-1234-5678-9abc-1234567890ab")
                 if not state.get("ms_flow"):
-                    if st.button("Sign in with Microsoft", width="stretch"):
+                    if st.button("Sign in with Microsoft", width="stretch", disabled=not client_id.strip()):
+                        if not saved_id:
+                            mailbox.save_ms_client_id(client_id)
                         state.ms_app, state.ms_flow = mailbox.outlook_start_sign_in(client_id)
+                        st.rerun()
+                    if where == "this computer" and st.button("Use a different Microsoft app", width="stretch"):
+                        mailbox.forget_ms_client_id()
                         st.rerun()
                 else:
                     flow = state.ms_flow
@@ -96,13 +109,31 @@ def mailbox_import() -> None:
                         state.ms_flow = state.ms_app = None
                         st.rerun()
             else:
-                if st.button("Sign in with Google", width="stretch"):
-                    with st.spinner("Finish signing in in the browser tab that opened…"):
-                        token = mailbox.gmail_sign_in()
-                    with st.spinner("Fetching mail…"):
-                        set_messages(mailbox.gmail_fetch(token, int(limit), int(days)), "your Gmail inbox", real_mail=True)
-                    use_current_time()
-                    st.rerun()
+                found = mailbox.google_client_file()
+                if found is None:
+                    st.markdown("**One-time setup:** create a *Desktop app* OAuth client in Google Cloud "
+                                "([5-minute guide](https://github.com/WW-WalterWhite/campusmail#gmail)), "
+                                "download its JSON file and drop it here. It is remembered on this computer.")
+                    upload = st.file_uploader("Google client file", type=["json"], key="google_client_upload")
+                    if upload is not None and state.get("google_upload_id") != upload.file_id:
+                        state.google_upload_id = upload.file_id
+                        mailbox.save_google_client(upload.getvalue())
+                        st.rerun()
+                else:
+                    path, where = found
+                    client = mailbox.google_client_id(path)
+                    st.caption(f"Google app {client.split('-')[0] or path.name} (saved on {where}).")
+                    if st.button("Sign in with Google", type="primary", width="stretch"):
+                        with st.spinner("Finish signing in in the browser tab that opened…"):
+                            token = mailbox.gmail_sign_in(path)
+                        with st.spinner("Fetching mail…"):
+                            set_messages(mailbox.gmail_fetch(token, int(limit), int(days)), "your Gmail inbox",
+                                         real_mail=True)
+                        use_current_time()
+                        st.rerun()
+                    if where == "this computer" and st.button("Use a different Google app", width="stretch"):
+                        mailbox.forget_google_client()
+                        st.rerun()
         except mailbox.MailboxError as exc:
             state.ms_flow = state.ms_app = None
             st.error(str(exc))
