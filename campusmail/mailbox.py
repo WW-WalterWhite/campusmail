@@ -10,7 +10,8 @@
 Where the registration is looked up, first match wins:
 1. environment variables (CAMPUSMAIL_GOOGLE_CLIENT_FILE, CAMPUSMAIL_MS_CLIENT_ID);
 2. this computer's `secrets/` folder, written by the in-app setup (git-ignored);
-3. `team_setup/`, which a team may commit to its private repository so members skip the setup.
+3. `campusmail/sign_in/`, the registration built into this copy of the app. When the developer
+   puts it there, users only press "Sign in" and approve access in a browser pop-up.
 Registering the app with Google or Microsoft is described in the README.
 """
 
@@ -39,7 +40,7 @@ GMAIL_SCOPES = ["https://www.googleapis.com/auth/gmail.readonly"]
 MS_AUTHORITY = "https://login.microsoftonline.com/" + os.environ.get("CAMPUSMAIL_MS_TENANT", "common")
 ROOT = Path(__file__).resolve().parent.parent
 LOCAL_DIR = ROOT / "secrets"
-TEAM_DIR = ROOT / "team_setup"
+BUILTIN_DIR = ROOT / "campusmail" / "sign_in"
 GOOGLE_FILE_NAME = "google_client.json"
 MS_FILE_NAME = "microsoft_client_id.txt"
 GUID = re.compile(r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$", re.I)
@@ -60,12 +61,12 @@ class MailboxError(RuntimeError):
 # ---------------------------------------------------------------- one-time app setup
 
 def google_client_file() -> tuple[Path, str] | None:
-    """The Google client file to use and where it came from ("environment", "this computer", "team")."""
+    """The Google client file to use and where it came from ("environment", "this computer", "built in")."""
     env = os.environ.get("CAMPUSMAIL_GOOGLE_CLIENT_FILE")
     candidates = ([(Path(env), "environment")] if env else []) + [
         (LOCAL_DIR / GOOGLE_FILE_NAME, "this computer"),
         (LOCAL_DIR / "google_client_secret.json", "this computer"),  # the name earlier README steps used
-        (TEAM_DIR / GOOGLE_FILE_NAME, "team"),
+        (BUILTIN_DIR / GOOGLE_FILE_NAME, "built in"),
     ]
     return next(((path, where) for path, where in candidates if path.is_file()), None)
 
@@ -90,11 +91,13 @@ def parse_google_client(data: bytes | str) -> dict:
     return info
 
 
-def save_google_client(data: bytes | str) -> str:
-    """Validate and save the client file on this computer. Returns the client ID."""
+def save_google_client(data: bytes | str, built_in: bool = False) -> str:
+    """Validate and save the client file, on this computer only or built into this copy of the app.
+    Returns the client ID."""
     info = parse_google_client(data)
-    LOCAL_DIR.mkdir(exist_ok=True)
-    (LOCAL_DIR / GOOGLE_FILE_NAME).write_text(json.dumps(info, indent=2), encoding="utf-8")
+    folder = BUILTIN_DIR if built_in else LOCAL_DIR
+    folder.mkdir(exist_ok=True)
+    (folder / GOOGLE_FILE_NAME).write_text(json.dumps(info, indent=2), encoding="utf-8")
     return info["installed"]["client_id"]
 
 
@@ -106,7 +109,7 @@ def google_client_id(path: Path) -> str:
 
 
 def forget_google_client() -> None:
-    """Remove this computer's saved client files (a team file in team_setup/ is left alone)."""
+    """Remove this computer's saved client files (the built-in registration is left alone)."""
     for name in (GOOGLE_FILE_NAME, "google_client_secret.json"):
         (LOCAL_DIR / name).unlink(missing_ok=True)
 
@@ -115,7 +118,7 @@ def ms_client_id() -> tuple[str, str]:
     """The Microsoft app ID and where it came from, or ("", "")."""
     if os.environ.get("CAMPUSMAIL_MS_CLIENT_ID"):
         return os.environ["CAMPUSMAIL_MS_CLIENT_ID"].strip(), "environment"
-    for path, where in ((LOCAL_DIR / MS_FILE_NAME, "this computer"), (TEAM_DIR / MS_FILE_NAME, "team")):
+    for path, where in ((LOCAL_DIR / MS_FILE_NAME, "this computer"), (BUILTIN_DIR / MS_FILE_NAME, "built in")):
         if path.is_file():
             value = path.read_text(encoding="utf-8").strip()
             if value:
@@ -127,13 +130,14 @@ def forget_ms_client_id() -> None:
     (LOCAL_DIR / MS_FILE_NAME).unlink(missing_ok=True)
 
 
-def save_ms_client_id(value: str) -> str:
+def save_ms_client_id(value: str, built_in: bool = False) -> str:
     value = value.strip()
     if not GUID.match(value):
         raise MailboxError("That is not a Microsoft app ID. Copy the 'Application (client) ID' from the app's "
                            "Overview page; it looks like 1a2b3c4d-1234-5678-9abc-1234567890ab.")
-    LOCAL_DIR.mkdir(exist_ok=True)
-    (LOCAL_DIR / MS_FILE_NAME).write_text(value + "\n", encoding="utf-8")
+    folder = BUILTIN_DIR if built_in else LOCAL_DIR
+    folder.mkdir(exist_ok=True)
+    (folder / MS_FILE_NAME).write_text(value + "\n", encoding="utf-8")
     return value
 
 
@@ -252,7 +256,7 @@ def outlook_start_sign_in(client_id: str = "", authority: str = MS_AUTHORITY):
 
     client_id = (client_id or ms_client_id()[0]).strip()
     if not client_id:
-        raise MailboxError("No Microsoft app ID yet. Paste it in the sidebar once (see README).")
+        raise MailboxError("Outlook sign-in is not set up in this copy of CampusMail yet (see Settings).")
     if not GUID.match(client_id):
         raise MailboxError("That is not a Microsoft app ID. Copy the 'Application (client) ID' from the app's "
                            "Overview page.")
@@ -261,6 +265,30 @@ def outlook_start_sign_in(client_id: str = "", authority: str = MS_AUTHORITY):
     if "user_code" not in flow:
         raise MailboxError(f"Microsoft sign-in could not start: {flow.get('error_description', flow)}")
     return app, flow
+
+
+def outlook_sign_in_popup(client_id: str = "", authority: str = MS_AUTHORITY, timeout: int = 180,
+                          login_hint: str = "") -> str:
+    """Open Microsoft's sign-in page in the browser and wait for the user to approve; returns a token.
+
+    Uses the authorization-code flow with PKCE and a http://localhost redirect, which the app
+    registration must list under "Mobile and desktop applications" (see README).
+    """
+    import msal
+
+    client_id = (client_id or ms_client_id()[0]).strip()
+    if not client_id:
+        raise MailboxError("Outlook sign-in is not set up in this copy of CampusMail yet (see Settings).")
+    app = msal.PublicClientApplication(client_id, authority=authority, token_cache=msal.TokenCache())
+    try:
+        result = app.acquire_token_interactive(MS_SCOPES, prompt="select_account", timeout=timeout,
+                                               login_hint=login_hint or None)
+    except Exception as exc:  # no browser, port in use, closed window
+        raise MailboxError(f"The Microsoft sign-in window did not finish: {exc}. Try 'Use a code instead'.") from exc
+    if "access_token" not in result:
+        raise MailboxError(f"Microsoft sign-in failed: {result.get('error_description', result.get('error'))} "
+                           + ORG_BLOCK_HINT)
+    return result["access_token"]
 
 
 def outlook_finish_sign_in(app, flow) -> str:
@@ -300,21 +328,21 @@ def outlook_fetch(token: str, limit: int = MAX_MESSAGES, days: int = 14, session
 
 # ---------------------------------------------------------------- Gmail
 
-def gmail_sign_in(client_file: Path | str | None = None) -> str:
+def gmail_sign_in(client_file: Path | str | None = None, login_hint: str = "") -> str:
     """Opens Google's sign-in page in the browser and waits for consent; returns an access token."""
     from google_auth_oauthlib.flow import InstalledAppFlow
 
     if client_file is None:
         found = google_client_file()
         if found is None:
-            raise MailboxError("Gmail is not set up on this computer yet. Add the Google client file in the sidebar "
-                               "(see README).")
+            raise MailboxError("Gmail sign-in is not set up in this copy of CampusMail yet (see Settings).")
         client_file = found[0]
     if not Path(client_file).exists():
         raise MailboxError(f"Google client file not found at {client_file}. See the README for how to create it.")
     flow = InstalledAppFlow.from_client_secrets_file(str(client_file), scopes=GMAIL_SCOPES)
     try:
-        credentials = flow.run_local_server(port=0, open_browser=True, timeout_seconds=300)
+        extra = {"login_hint": login_hint} if login_hint else {}
+        credentials = flow.run_local_server(port=0, open_browser=True, timeout_seconds=300, **extra)
     except Exception as exc:  # the library raises several types for cancelled or timed-out sign-ins
         raise MailboxError(f"Google sign-in did not finish: {exc}") from exc
     return credentials.token

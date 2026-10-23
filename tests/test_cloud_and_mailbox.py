@@ -149,7 +149,7 @@ def test_mail_errors_are_readable():
     session = FakeSession({"/me/mailFolders/inbox/messages": 403})
     with pytest.raises(mailbox.MailboxError, match="approve the app"):
         mailbox.outlook_fetch("token", session=session)
-    with pytest.raises(mailbox.MailboxError, match="app ID"):
+    with pytest.raises(mailbox.MailboxError, match="not set up"):
         mailbox.outlook_start_sign_in("")
     with pytest.raises(mailbox.MailboxError, match="not found"):
         mailbox.gmail_sign_in("does/not/exist.json")
@@ -205,12 +205,8 @@ APP_ID = "1a2b3c4d-1234-5678-9abc-1234567890ab"
 
 
 @pytest.fixture
-def setup_dirs(tmp_path, monkeypatch):
-    monkeypatch.setattr(mailbox, "LOCAL_DIR", tmp_path / "secrets")
-    monkeypatch.setattr(mailbox, "TEAM_DIR", tmp_path / "team_setup")
-    monkeypatch.delenv("CAMPUSMAIL_GOOGLE_CLIENT_FILE", raising=False)
-    monkeypatch.delenv("CAMPUSMAIL_MS_CLIENT_ID", raising=False)
-    return tmp_path
+def setup_dirs(isolated_user_files):
+    return isolated_user_files
 
 
 def test_google_client_is_saved_once_and_found_again(setup_dirs):
@@ -222,14 +218,37 @@ def test_google_client_is_saved_once_and_found_again(setup_dirs):
     assert mailbox.google_client_file() is None
 
 
-def test_team_setup_is_used_when_nothing_is_saved_locally(setup_dirs):
-    (setup_dirs / "team_setup").mkdir()
-    (setup_dirs / "team_setup" / "google_client.json").write_text(json.dumps(DESKTOP_CLIENT))
-    (setup_dirs / "team_setup" / "microsoft_client_id.txt").write_text(APP_ID + "\n")
-    assert mailbox.google_client_file()[1] == "team"
-    assert mailbox.ms_client_id() == (APP_ID, "team")
+def test_built_in_registration_needs_no_setup_by_the_user(setup_dirs):
+    mailbox.save_google_client(json.dumps(DESKTOP_CLIENT), built_in=True)
+    mailbox.save_ms_client_id(APP_ID, built_in=True)
+    assert (setup_dirs / "sign_in" / "google_client.json").is_file()
+    assert mailbox.google_client_file()[1] == "built in"
+    assert mailbox.ms_client_id() == (APP_ID, "built in")
     mailbox.save_ms_client_id("ffffffff-1234-5678-9abc-1234567890ab")
-    assert mailbox.ms_client_id()[1] == "this computer"  # a personal choice wins over the team's
+    assert mailbox.ms_client_id()[1] == "this computer"  # a local override wins
+    mailbox.forget_ms_client_id()
+    assert mailbox.ms_client_id() == (APP_ID, "built in")  # forgetting never touches the built-in one
+
+
+def test_outlook_pop_up_sign_in(setup_dirs, monkeypatch):
+    import msal
+    seen = {}
+
+    class FakeApp:
+        def __init__(self, client_id, authority, token_cache):
+            seen["client_id"] = client_id
+
+        def acquire_token_interactive(self, scopes, **kwargs):
+            seen.update(scopes=scopes, **kwargs)
+            return {"access_token": "tok"}
+
+    monkeypatch.setattr(msal, "PublicClientApplication", FakeApp)
+    with pytest.raises(mailbox.MailboxError, match="not set up"):
+        mailbox.outlook_sign_in_popup()
+    mailbox.save_ms_client_id(APP_ID, built_in=True)
+    assert mailbox.outlook_sign_in_popup(login_hint="me@outlook.com") == "tok"
+    assert seen["client_id"] == APP_ID and seen["scopes"] == ["Mail.Read"]
+    assert seen["login_hint"] == "me@outlook.com" and seen["prompt"] == "select_account"
 
 
 @pytest.mark.parametrize("data,message", [

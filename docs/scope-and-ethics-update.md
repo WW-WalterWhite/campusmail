@@ -40,9 +40,11 @@ permissions (`Mail.Read`, `gmail.readonly`), so these actions are impossible, no
   retention terms before using it with real mail.
 - **Privacy (mailbox import):** sign-in uses the provider's own OAuth page; CampusMail never sees
   the password. Access tokens and fetched messages are held in memory for the session only, are
-  not written to disk or logged, and **Clear session** removes them. The only thing saved is
-  the app's own registration (Google client file or Microsoft app ID) in a git-ignored folder,
-  so sign-in is one click after a one-time setup. No inbox content is committed to the repository. Real-mail trials are voluntary and use the participant's own
+  not written to disk or logged, and **Clear session** removes them. Saved on disk are only
+  the app's own registration (built in by the developer, so users just approve a Google or
+  Microsoft sign-in window) and, if the student fills them in, their profile and settings in
+  the git-ignored `private/` folder, which **Settings → Delete my saved profile and settings**
+  removes. No inbox content is committed to the repository. Real-mail trials are voluntary and use the participant's own
   account on their own computer.
 - **Institutional rules:** HKU's Microsoft 365 tenant may require IT approval before any app can
   read mail. The team will not try to bypass this; if consent is not granted, demos use personal

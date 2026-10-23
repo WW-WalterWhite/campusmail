@@ -46,29 +46,47 @@ def test_cloud_engine_needs_key_and_consent(app, monkeypatch):
     assert not button(app, "Sort and summarize").disabled
 
 
-def test_mail_setup_is_asked_once_then_sign_in_is_one_click(app, tmp_path, monkeypatch):
+def test_users_see_one_sign_in_button_and_no_file_steps(app):
     from campusmail import mailbox
-    monkeypatch.setattr(mailbox, "LOCAL_DIR", tmp_path / "secrets")
-    monkeypatch.setattr(mailbox, "TEAM_DIR", tmp_path / "team_setup")
-    monkeypatch.delenv("CAMPUSMAIL_GOOGLE_CLIENT_FILE", raising=False)
-    monkeypatch.delenv("CAMPUSMAIL_MS_CLIENT_ID", raising=False)
     account = next(r for r in app.radio if r.label == "Account")
-    account.set_value("Gmail").run()
     assert not app.exception
     assert not any(b.label == "Sign in with Google" for b in app.button)
-    assert any("One-time setup" in m.value for m in app.markdown)
+    assert any("not built into this copy" in i.value for i in app.info)
+    assert not app.get("file_uploader")[1:]  # only the CSV import, no credential upload for users
 
-    mailbox.save_google_client(b'{"installed": {"client_id": "123-abc.apps.googleusercontent.com", "client_secret": "s"}}')
+    mailbox.save_google_client(b'{"installed": {"client_id": "1-a.apps.googleusercontent.com", "client_secret": "s"}}',
+                               built_in=True)
     app.run()
     assert any(b.label == "Sign in with Google" for b in app.button)
-    assert any("saved on this computer" in c.value for c in app.caption)
-
     account.set_value("Outlook / HKU (Microsoft 365)").run()
-    assert button(app, "Sign in with Microsoft").disabled  # no app ID yet
-    next(t for t in app.text_input if t.label == "Microsoft app ID").input("not-an-id").run()
-    button(app, "Sign in with Microsoft").click().run()
-    assert any("not a Microsoft app ID" in e.value for e in app.error)
-    assert mailbox.ms_client_id() == ("", "")
+    assert any("HKU IT" in i.value for i in app.info)
+    mailbox.save_ms_client_id("1a2b3c4d-1234-5678-9abc-1234567890ab", built_in=True)
+    app.run()
+    assert any(b.label == "Sign in with Microsoft" for b in app.button)
+    assert any(b.label.startswith("No window?") for b in app.button)
+
+
+def test_profile_and_settings_pages(app):
+    from campusmail import userdata
+    from streamlit import config
+    app.switch_page("views/profile.py").run()
+    assert not app.exception
+    next(t for t in app.text_input if t.label == "Name").input("Chan Tai Man")
+    next(t for t in app.text_area if t.label.startswith("Your courses")).input("comp 3297, AILT9019")
+    next(b for b in app.button if b.label == "Save profile").click().run()
+    assert userdata.load_profile()["courses"] == ["AILT9019", "COMP3297"]
+
+    app.switch_page("views/inbox.py").run()
+    assert app.session_state["courses_text"] == "AILT9019, COMP3297"
+    assert any("Hi Chan!" in h.proto.body for h in app.get("html"))
+
+    app.switch_page("views/settings.py").run()
+    assert not app.exception
+    app.get("button_group")[0].set_value("Dark").run()
+    assert userdata.load_settings()["theme"] == "Dark"
+    assert config.get_option("theme.light.backgroundColor") == config.get_option("theme.dark.backgroundColor")
+    next(b for b in app.button if b.label == "Delete my saved profile and settings").click().run()
+    assert userdata.load_profile()["name"] == "" and userdata.load_settings()["theme"] == "Match my computer"
 
 
 def test_email_text_is_escaped_for_markdown():
