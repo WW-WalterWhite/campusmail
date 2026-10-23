@@ -9,3 +9,41 @@ maxUploadSize = 1
 [client]
 # Hide the developer toolbar (Deploy button) for classmates using the app.
 toolbarMode = "minimal"
+
+# Colours match the project webpage (docs/index.html). Streamlit follows the system light/dark
+# setting, and each palette is tuned for readable text on its own background.
+[theme]
+baseRadius = "0.6rem"
+buttonRadius = "0.5rem"
+headingFontWeights = [700, 650, 600]
+showSidebarBorder = true
+
+[theme.light]
+primaryColor = "#c8322d"
+backgroundColor = "#fbfaf7"
+secondaryBackgroundColor = "#f2f0eb"
+textColor = "#1d2125"
+borderColor = "#e3e1da"
+linkColor = "#b02a25"
+violetColor = "#6c3fb5"
+orangeColor = "#c96f12"
+redColor = "#c8322d"
+grayColor = "#6b7280"
+
+[theme.light.sidebar]
+backgroundColor = "#f2f0eb"
+
+[theme.dark]
+primaryColor = "#e5534b"
+backgroundColor = "#15171a"
+secondaryBackgroundColor = "#1f2226"
+textColor = "#e8e6e1"
+borderColor = "#30343a"
+linkColor = "#ff8a83"
+violetColor = "#a98bf0"
+orangeColor = "#f0a050"
+redColor = "#ff6b63"
+grayColor = "#9aa1a8"
+
+[theme.dark.sidebar]
+backgroundColor = "#1b1d21"

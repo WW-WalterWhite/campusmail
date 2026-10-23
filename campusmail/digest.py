@@ -89,6 +89,8 @@ def render_ics(run: Run, now: datetime) -> str:
             ])
             event = ["BEGIN:VEVENT", f"UID:{uid}@campusmail", f"DTSTAMP:{stamp}",
                      f"SUMMARY:{_ics_text(title)}", f"DESCRIPTION:{_ics_text(description)}"]
+            if m.link:  # opens the email in Outlook or Gmail
+                event.append(f"URL:{m.link}")
             if r.deadline_has_time:
                 at = r.deadline.astimezone(timezone.utc)
                 if x and x.category == "schedule_change":

@@ -3,6 +3,7 @@
     python eval/evaluate.py                                   # rules baseline on the sample inbox
     python eval/evaluate.py --engine ollama                   # the local model (Ollama must be running)
     python eval/evaluate.py --set dev --engine ollama --repeat 5 --out results/dev_ollama
+    python eval/evaluate.py --set dev --engine cloud --provider "Anthropic (Claude)"   # key from ANTHROPIC_API_KEY
     python eval/evaluate.py --inbox my.csv --labels my_labels.csv --profile my_profile.json
 
 Labels CSV: message_id, expected_priority (High / Medium / Low / Needs review) and optionally
@@ -34,7 +35,7 @@ sys.path.insert(0, str(ROOT))
 from campusmail import pipeline  # noqa: E402
 from campusmail.extraction import PROMPT_VERSION  # noqa: E402
 from campusmail.importer import load_csv, parse_received  # noqa: E402
-from campusmail.llm import DEFAULT_MODEL, OllamaClient  # noqa: E402
+from campusmail.llm import CLOUD_PROVIDERS, DEFAULT_MODEL, LLMUnavailable, OllamaClient, cloud_client, key_from_env  # noqa: E402
 from campusmail.models import Priority  # noqa: E402
 
 BANDS = [Priority.HIGH.value, Priority.MEDIUM.value, Priority.LOW.value]
@@ -114,6 +115,13 @@ def make_client(args):
         if not ready:
             raise SystemExit(status)
         print(status)
+        return client
+    if args.engine == "cloud":
+        try:
+            client = cloud_client(args.provider, key_from_env(args.provider), args.model, args.base_url)
+        except LLMUnavailable as exc:
+            raise SystemExit(f"{exc} (expected variable: {CLOUD_PROVIDERS[args.provider]['key_env']})")
+        print(f"Sending the messages to {args.provider} ({client.model}).")
         return client
     return None
 
@@ -201,8 +209,11 @@ def main() -> None:
     parser.add_argument("--inbox", type=Path, help="CSV of messages (overrides --set)")
     parser.add_argument("--labels", type=Path, help="labels CSV (overrides --set)")
     parser.add_argument("--profile", default=ROOT / "data/sample_profile.json", type=Path)
-    parser.add_argument("--engine", choices=["rules", "ollama"], default="rules")
-    parser.add_argument("--model", help=f"model name (default: {DEFAULT_MODEL} for Ollama)")
+    parser.add_argument("--engine", choices=["rules", "ollama", "cloud"], default="rules")
+    parser.add_argument("--model", help=f"model name (default: {DEFAULT_MODEL} for Ollama, the provider preset for cloud)")
+    parser.add_argument("--provider", choices=list(CLOUD_PROVIDERS), default="OpenAI",
+                        help="cloud provider; the API key is read from its environment variable")
+    parser.add_argument("--base-url", help="base URL for 'Other OpenAI-compatible'")
     parser.add_argument("--repeat", type=int, default=1, help="run N times to measure time (scores use the last run)")
     parser.add_argument("--out", type=Path, help="write PREFIX.csv and PREFIX.json")
     args = parser.parse_args()

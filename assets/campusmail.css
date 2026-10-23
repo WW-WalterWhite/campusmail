@@ -1,0 +1,44 @@
+/* CampusMail look. Colours are mid-tones that read on both the light and the dark theme. */
+.st-key-band-review, [class*="st-key-card-review"] { --band: #7c4dce; }
+.st-key-band-high,   [class*="st-key-card-high"]   { --band: #d23b33; }
+.st-key-band-medium, [class*="st-key-card-medium"] { --band: #dd8a2e; }
+.st-key-band-low,    [class*="st-key-card-low"]    { --band: #8a9097; }
+
+/* Priority overview cards: a coloured top edge. */
+[class*="st-key-band-"] { border-top: 4px solid var(--band) !important; }
+[class*="st-key-band-"] [data-testid="stMetricValue"] { color: var(--band); }
+
+/* Result cards: a coloured left edge. */
+[class*="st-key-card-"] { border-left: 5px solid var(--band) !important; }
+
+/* Header */
+.cm-hero { display: flex; align-items: center; gap: 14px; margin-bottom: 2px; }
+.cm-hero img { flex: none; }
+.cm-hero h1 { font-size: 2.1rem; line-height: 1.1; margin: 0; padding: 0; }
+.cm-hero p { margin: 4px 0 0; opacity: .72; font-size: 1rem; }
+.cm-chips { display: flex; flex-wrap: wrap; gap: 8px; margin: 10px 0 4px; }
+.cm-chip { font-size: .85rem; padding: 3px 11px; border-radius: 999px;
+           background: rgba(128, 128, 128, .10); border: 1px solid rgba(128, 128, 128, .28); }
+.cm-chip b { font-weight: 600; }
+
+/* The original email inside a review card. */
+.cm-original { white-space: pre-wrap; font-size: .92rem; line-height: 1.5; padding: 10px 14px;
+               border-radius: 8px; background: rgba(128, 128, 128, .08);
+               border: 1px solid rgba(128, 128, 128, .22); max-height: 260px; overflow-y: auto; }
+
+/* Small all-caps labels for Action / Deadline. */
+.cm-label { font-size: .72rem; letter-spacing: .06em; text-transform: uppercase; opacity: .65; margin: 0;
+            margin-bottom: 0; }
+
+/* Less empty space above the sidebar steps. */
+[data-testid="stSidebarHeader"] { padding-bottom: 0; }
+[data-testid="stSidebarUserContent"] { padding-top: .5rem; }
+
+/* Facts, summary and quoted sources inside a result card. */
+.cm-facts { display: grid; grid-template-columns: 3fr 2fr; gap: 8px 28px; margin-bottom: 10px; }
+@media (max-width: 640px) { .cm-facts { grid-template-columns: 1fr; } }
+.cm-value { margin: 2px 0 10px; }
+.cm-facts .cm-value { margin-bottom: 0; }
+.cm-quote { margin: 6px 0; padding: 2px 0 2px 12px; border-left: 3px solid rgba(128, 128, 128, .45);
+            font-size: .95rem; opacity: .88; }
+.cm-src { font-size: .8rem; margin-left: 4px; white-space: nowrap; color: inherit; opacity: .7; }

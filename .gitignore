@@ -6,3 +6,6 @@ __pycache__/
 results/
 private/
 *.inbox.csv
+# OAuth client files and other credentials
+secrets/
+.env
