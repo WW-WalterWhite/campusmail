@@ -16,6 +16,20 @@ and [Optional: import from Outlook or Gmail](#optional-import-from-outlook-or-gm
 > CampusMail never sends, deletes or changes emails, never opens links or attachments, and can
 > miss or misread messages. **Check the original email before acting.**
 
+## For the AILT9019 teaching team
+
+| deliverable | where |
+|---|---|
+| Project webpage | [docs/index.html](docs/index.html), published with GitHub Pages at <https://ww-walterwhite.github.io/campusmail/> |
+| Demo video and 3-minute presentation | linked from the webpage's *See it working* section |
+| Evaluation data, method and results | [docs/EVALUATION.md](docs/EVALUATION.md), `data/`, `eval/` |
+| AI-use disclosure | [docs/AI_USE_LOG.md](docs/AI_USE_LOG.md) |
+| Proposal outline and course objectives | [docs/project-outline.md](docs/project-outline.md), [docs/course-objectives.md](docs/course-objectives.md) |
+
+The fastest check that everything works, with no model download: `pip install -r requirements-dev.txt`
+then `python -m pytest` (106 tests), and `python eval/evaluate.py --set dev` for the rules baseline.
+The full local-AI run is described in [Quick start](#quick-start) below.
+
 ## Quick start
 
 ### 1. Prerequisites (once)
@@ -310,9 +324,10 @@ evaluation script and automated tests.
 
 **Not yet / known limits:**
 
-- The 40-message development set has draft labels that the team still has to check, and the
-  80-message locked test set does not exist yet. No accuracy figures are claimed.
-- Laptop feasibility (time per message, RAM) still has to be measured on team members' machines.
+- The datasets are synthetic and were written by the people (and AI assistant) who built the rules, so
+  scores on them overstate real-inbox performance. See [docs/EVALUATION.md](docs/EVALUATION.md) for what
+  the numbers can and cannot show.
+- Model accuracy and speed depend on the laptop; the numbers we report were measured on one team laptop.
 - The cloud engines and mailbox import are tested against recorded API shapes, not live
   accounts; the first real sign-in and the first paid API call still need to be tried by the team.
 - English only. Messages in one thread are ranked separately; an older message with a deadline only gets a
@@ -334,6 +349,7 @@ data/                  synthetic sample inbox, labels and course profile
 eval/evaluate.py       evaluation script (docs/EVALUATION.md explains the datasets)
 tests/                 pytest suite
 docs/AI_USE_LOG.md     log of AI assistance used in development
+docs/project-outline.md, docs/course-objectives.md   project outline and course objectives
 docs/index.html        project webpage (GitHub Pages: Settings → Pages → Deploy from branch → main, /docs)
 setup.bat / run.bat    Windows setup and launcher (setup.sh / run.sh for macOS and Linux)
 ```
