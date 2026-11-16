@@ -151,6 +151,25 @@
 </section>
 
 
+<section id="built">
+  <div class="wrap">
+    <h2>What we built, and what we reused</h2>
+    <div class="table-wrap">
+    <table>
+      <thead><tr><th>Part</th><th>Existing tool we used</th><th>Built by our team</th></tr></thead>
+      <tbody>
+        <tr><td>Reading each email</td><td>Qwen3 4B through Ollama, with JSON-schema output</td><td>The prompt, the schema, type checks and one repair attempt; email text is passed as untrusted data</td></tr>
+        <tr><td>Checking the AI</td><td>none</td><td>An evidence checker: every quote, deadline, course and number must appear in the email, or it goes to review</td></tr>
+        <tr><td>Deciding priority</td><td>none</td><td>A fixed 48-hour policy in Hong Kong time, using your own course list; the AI never sets the priority</td></tr>
+        <tr><td>Interface</td><td>Streamlit</td><td>Review queue on top, reasons and source quotes, corrections, digest and calendar export, an "AI unavailable" fallback</td></tr>
+        <tr><td>Testing</td><td>pytest, GitHub Actions</td><td>Synthetic test sets, an evaluation script with a deadline safety gate, and 106 automated tests</td></tr>
+      </tbody>
+    </table>
+    </div>
+    <p class="small">Domain customisation: the course list decides which updates matter, campus timing (48 hours, overdue quizzes, moved tutorials) decides the band, and campus traps such as "URGENT!!!" on an optional fair are handled on purpose.</p>
+  </div>
+</section>
+
 <section id="results">
   <div class="wrap">
     <h2>How well it works</h2>
@@ -171,6 +190,13 @@
       both sets, but only because they were tuned to them, so we don't count that as a result. All 12 scripted fail-safe cases
       (prompt injection, ambiguous dates, oversized input, model failure, requests to send or delete mail) pass in the automated tests.
       How to reproduce every number is in <a href="https://github.com/WW-WalterWhite/campusmail/blob/main/docs/EVALUATION.md">EVALUATION.md</a>.</p>
+    <h3>When it fails</h3>
+    <p>On harder emails it had never seen, the rules found only 2 of 5 urgent emails. For example, it was expected to mark
+      "Due: 22 Oct, 11:59 PM" as High, but the date parser did not know that format. Because nothing could be verified, no
+      deadline was invented, but a missed High is the worst error for a student. We extended the parser and kept the
+      challenge set as evidence.
+      <!-- FAILURE: add one real Qwen3 failure here: input, expected, observed. --></p>
+
   </div>
 </section>
 
@@ -208,7 +234,7 @@
   <div class="wrap">
     <h2>Team</h2>
     <!-- TEAM: replace with your team ID, names and roles. -->
-    <p>Team [team ID]: [Name] (role), [Name] (role), [Name] (role), [Name] (role).</p>
+    <p>Team [team ID]: [Name], [Name], [Name], [Name].</p>
     <p>We built CampusMail with the help of an AI coding assistant (Claude Code). The
       <a href="https://github.com/WW-WalterWhite/campusmail/blob/main/docs/AI_USE_LOG.md">AI use log</a> lists what it generated
       and how we checked it.</p>
