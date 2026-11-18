@@ -1,0 +1,17 @@
+message_id,expected_priority,expected_deadline
+c01,High,2026-10-22T23:59
+c02,High,2026-10-22
+c03,High,2026-10-22T23:59
+c04,High,2026-10-22
+c05,High,2026-10-22T12:00
+c06,Medium,2026-10-30T23:59
+c07,Medium,
+c08,Medium,2026-10-23T23:59
+c09,Medium,2026-11-06
+c10,Low,
+c11,Low,
+c12,Low,
+c13,Needs review,
+c14,Needs review,
+c15,Needs review,
+c16,Needs review,

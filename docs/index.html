@@ -1,0 +1,249 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>CampusMail</title>
+<meta name="description" content="CampusMail sorts university emails by priority and explains why, using a local AI model. AILT9019 project, HKU.">
+<style>
+  :root {
+    --bg: #fbfaf7; --surface: #ffffff; --text: #1d2125; --muted: #5b636b; --line: #e3e1da;
+    --accent: #c8322d; --accent-soft: #fbeceb; --review: #6c3fb5; --high: #c8322d; --medium: #d9822b; --low: #8a9097;
+    --code: #f1efe9;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #15171a; --surface: #1d2024; --text: #e8e6e1; --muted: #a2a8ae; --line: #30343a;
+      --accent: #ff6b63; --accent-soft: #3a2221; --code: #24282d;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #15171a; --surface: #1d2024; --text: #e8e6e1; --muted: #a2a8ae; --line: #30343a;
+    --accent: #ff6b63; --accent-soft: #3a2221; --code: #24282d;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text);
+         font: 17px/1.6 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  .wrap { max-width: 980px; margin: 0 auto; padding: 0 20px; }
+  header { padding: 64px 0 40px; border-bottom: 1px solid var(--line); }
+  .eyebrow { color: var(--muted); font-size: 14px; letter-spacing: .04em; text-transform: uppercase; }
+  h1 { font-size: clamp(34px, 6vw, 52px); line-height: 1.1; margin: 10px 0 16px; }
+  .lede { font-size: 20px; color: var(--muted); max-width: 680px; }
+  .buttons { margin-top: 26px; display: flex; flex-wrap: wrap; gap: 12px; }
+  .btn { display: inline-block; padding: 10px 18px; border-radius: 8px; text-decoration: none; font-weight: 600;
+         border: 1px solid var(--line); color: var(--text); background: var(--surface); }
+  .btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+  section { padding: 48px 0; border-bottom: 1px solid var(--line); }
+  h2 { font-size: 28px; margin: 0 0 18px; }
+  h3 { font-size: 19px; margin: 24px 0 8px; }
+  p, li { max-width: 720px; }
+  .bands { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 14px; margin-top: 18px; }
+  .band { background: var(--surface); border: 1px solid var(--line); border-left: 5px solid; border-radius: 8px; padding: 14px 16px; }
+  .band b { display: block; margin-bottom: 4px; }
+  .band.review { border-left-color: var(--review); } .band.high { border-left-color: var(--high); }
+  .band.medium { border-left-color: var(--medium); } .band.low { border-left-color: var(--low); }
+  .shots { display: grid; gap: 22px; }
+  figure { margin: 0; background: var(--surface); border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
+  figure img { display: block; width: 100%; height: auto; }
+  figcaption { padding: 10px 14px; color: var(--muted); font-size: 15px; }
+  ol.steps { padding-left: 22px; } ol.steps li { margin: 10px 0; }
+  code { background: var(--code); padding: 1px 6px; border-radius: 4px; font-size: 15px; }
+  pre { background: var(--code); padding: 14px 16px; border-radius: 8px; overflow-x: auto; font-size: 14px; }
+  .pipeline { display: flex; flex-wrap: wrap; gap: 8px; margin: 14px 0; }
+  .pipeline span { background: var(--surface); border: 1px solid var(--line); border-radius: 999px; padding: 4px 12px; font-size: 15px; }
+  .note { background: var(--accent-soft); border-radius: 8px; padding: 14px 16px; max-width: 720px; }
+  .video { position: relative; aspect-ratio: 16 / 9; background: var(--surface); border: 1px solid var(--line);
+           border-radius: 10px; overflow: hidden; display: grid; place-items: center; text-align: center; color: var(--muted); }
+  .video iframe, .video video { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; }
+  .grid2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 22px; }
+  .table-wrap { overflow-x: auto; }
+  table { border-collapse: collapse; width: 100%; font-size: 15px; background: var(--surface); }
+  th, td { border: 1px solid var(--line); padding: 7px 10px; text-align: left; vertical-align: top; }
+  th { background: var(--code); }
+  .small { color: var(--muted); font-size: 15px; }
+  footer { padding: 32px 0 56px; color: var(--muted); font-size: 15px; }
+  a { color: var(--accent); }
+</style>
+</head>
+<body>
+<header>
+  <div class="wrap">
+    <div class="eyebrow">AILT9019 AI Literacy II · HKU · 2026–27</div>
+    <h1>CampusMail</h1>
+    <p class="lede">Find the course emails that need you today. CampusMail sorts a batch of university emails into
+      <b>Needs review, High, Medium and Low</b>, explains every decision, and links each summary to the exact words in the
+      original email. It runs on your own laptop with a free local AI model.</p>
+    <div class="buttons">
+      <a class="btn primary" href="https://github.com/WW-WalterWhite/campusmail#quick-start">Install on your laptop</a>
+      <a class="btn" href="https://github.com/WW-WalterWhite/campusmail">Source code</a>
+      <a class="btn" href="#demo">Watch the demo</a>
+      <a class="btn" href="https://github.com/WW-WalterWhite/campusmail/blob/main/data/sample_inbox.csv">Sample inbox</a>
+    </div>
+  </div>
+</header>
+
+<section>
+  <div class="wrap">
+    <h2>Why</h2>
+    <p>Deadlines hide among routine updates, and subject lines don't tell an optional seminar from a required submission.
+      CampusMail reads each email for an action and an explicit deadline. A fixed, published rule set then decides the priority.
+      The AI never decides on its own.</p>
+    <div class="bands">
+      <div class="band review"><b>Needs review</b>Vague or conflicting dates, other time zones, text the app can't verify, or emails that try to instruct the AI. Always shown first.</div>
+      <div class="band high"><b>High</b>An action due within 48 hours, an overdue action, or a schedule change for one of your courses within 48 hours.</div>
+      <div class="band medium"><b>Medium</b>Any other required action, or an update for one of your courses.</div>
+      <div class="band low"><b>Low</b>General announcements with nothing to do. The word "URGENT" alone never raises a priority.</div>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="wrap">
+    <h2>What it looks like</h2>
+    <div class="shots">
+      <figure><img src="screenshots/overview.png" alt="CampusMail overview: counts per priority band and the review queue at the top" loading="lazy">
+        <figcaption>The sample inbox after sorting: counts per band, with the review queue first.</figcaption></figure>
+      <figure><img src="screenshots/review_item.png" alt="A message that needs review, showing the reason and the original email" loading="lazy">
+        <figcaption>"Please submit … soon" has no date, so it goes to review. CampusMail doesn't invent one.</figcaption></figure>
+      <figure><img src="screenshots/high_items.png" alt="High priority items with the reason, action, deadline and quoted source sentences" loading="lazy">
+        <figcaption>Every item says why it was placed there and quotes the email it came from.</figcaption></figure>
+    </div>
+  </div>
+</section>
+
+
+<section id="demo">
+  <div class="wrap">
+    <h2>See it working</h2>
+    <p>Recordings of the real application running on a team laptop with the local Qwen3 4B model. Nothing in them is mocked up.</p>
+    <div class="grid2">
+      <div>
+        <h3>Demo (full run)</h3>
+        <!-- DEMO VIDEO: replace the placeholder <div> below with an embed, e.g.
+             <iframe src="https://www.youtube-nocookie.com/embed/VIDEO_ID" title="CampusMail demo" allowfullscreen></iframe> -->
+        <div class="video">Demo video coming soon</div>
+        <p class="small">A successful run on the sample inbox, a correction, the exports, and a case where CampusMail refuses to guess.</p>
+      </div>
+      <div>
+        <h3>Presentation (3 minutes)</h3>
+        <!-- PRESENTATION VIDEO: replace the placeholder <div> below in the same way. -->
+        <div class="video">Presentation video coming soon</div>
+        <p class="small">The problem, our approach, one successful run, one limitation, and what we learned.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="wrap">
+    <h2>How it works</h2>
+    <div class="pipeline"><span>Import</span><span>Validate</span><span>Extract with AI</span><span>Check evidence</span><span>Rank</span><span>Summarize</span><span>Review</span></div>
+    <ul>
+      <li><b>Extract:</b> Qwen3 4B, running locally through Ollama, returns structured fields: course, action, deadline, a short summary and exact quotations.</li>
+      <li><b>Check evidence:</b> code, not the model, verifies that every quotation, deadline, course and number appears in the email. Anything unsupported goes to review.</li>
+      <li><b>Rank:</b> a deterministic policy in Hong Kong time decides the band, and you can correct any priority or deadline.</li>
+      <li><b>Export:</b> a plain-text digest, and a calendar file (.ics) with High and Medium deadlines. Items that need review stay out of your calendar.</li>
+      <li><b>Fallback:</b> if the AI is unavailable, the app says so and shows a clearly labelled rules-only view. It never shows a made-up summary.</li>
+    </ul>
+    <p>Optional extras: a cloud model (OpenAI, Claude, DeepSeek, Qwen) with an explicit confirmation before any email leaves your
+      laptop, and read-only import from Outlook / HKU mail or Gmail.</p>
+  </div>
+</section>
+
+
+<section id="built">
+  <div class="wrap">
+    <h2>What we built, and what we reused</h2>
+    <div class="table-wrap">
+    <table>
+      <thead><tr><th>Part</th><th>Existing tool we used</th><th>Built by our team</th></tr></thead>
+      <tbody>
+        <tr><td>Reading each email</td><td>Qwen3 4B through Ollama, with JSON-schema output</td><td>The prompt, the schema, type checks and one repair attempt; email text is passed as untrusted data</td></tr>
+        <tr><td>Checking the AI</td><td>none</td><td>An evidence checker: every quote, deadline, course and number must appear in the email, or it goes to review</td></tr>
+        <tr><td>Deciding priority</td><td>none</td><td>A fixed 48-hour policy in Hong Kong time, using your own course list; the AI never sets the priority</td></tr>
+        <tr><td>Interface</td><td>Streamlit</td><td>Review queue on top, reasons and source quotes, corrections, digest and calendar export, an "AI unavailable" fallback</td></tr>
+        <tr><td>Testing</td><td>pytest, GitHub Actions</td><td>Synthetic test sets, an evaluation script with a deadline safety gate, and 106 automated tests</td></tr>
+      </tbody>
+    </table>
+    </div>
+    <p class="small">Domain customisation: the course list decides which updates matter, campus timing (48 hours, overdue quizzes, moved tutorials) decides the band, and campus traps such as "URGENT!!!" on an optional fair are handled on purpose.</p>
+  </div>
+</section>
+
+<section id="results">
+  <div class="wrap">
+    <h2>How well it works</h2>
+    <p>All test emails are synthetic. Macro-F1 is measured over emails labelled High, Medium or Low, and a "Needs review"
+      answer on those counts as a miss. The safety gate fails if any deadline is invented or wrong.</p>
+    <div class="table-wrap">
+    <table>
+      <thead><tr><th>Engine</th><th>Test set</th><th>Macro-F1</th><th>High found</th><th>Review flagged</th><th>Safety gate</th><th>Time per email</th></tr></thead>
+      <tbody>
+        <!-- RESULTS: add the Qwen3 rows from results/benchmark_<time>.md, and the locked test set if you made one. -->
+        <tr><td>Keyword and date rules</td><td>Development, 40 emails (first run)</td><td>0.93</td><td>8 / 10</td><td>8 / 10</td><td>not recorded</td><td>&lt; 0.01 s</td></tr>
+        <tr><td>Keyword and date rules</td><td>Challenge, 16 emails (first run)</td><td>0.77</td><td>2 / 5</td><td>2 / 4</td><td>not recorded</td><td>&lt; 0.01 s</td></tr>
+        <tr><td>Qwen3 4B (local)</td><td>Development, 40 emails</td><td colspan="5">being measured on a team laptop</td></tr>
+      </tbody>
+    </table>
+    </div>
+    <p class="small">The rules rows are the first run on each set, before we fixed the failures it revealed. The rules now score 1.00 on
+      both sets, but only because they were tuned to them, so we don't count that as a result. All 12 scripted fail-safe cases
+      (prompt injection, ambiguous dates, oversized input, model failure, requests to send or delete mail) pass in the automated tests.
+      How to reproduce every number is in <a href="https://github.com/WW-WalterWhite/campusmail/blob/main/docs/EVALUATION.md">EVALUATION.md</a>.</p>
+    <h3>When it fails</h3>
+    <p>On harder emails it had never seen, the rules found only 2 of 5 urgent emails. For example, it was expected to mark
+      "Due: 22 Oct, 11:59 PM" as High, but the date parser did not know that format. Because nothing could be verified, no
+      deadline was invented, but a missed High is the worst error for a student. We extended the parser and kept the
+      challenge set as evidence.
+      <!-- FAILURE: add one real Qwen3 failure here: input, expected, observed. --></p>
+
+  </div>
+</section>
+
+<section>
+  <div class="wrap">
+    <h2>Set up in about 10 minutes (Windows)</h2>
+    <ol class="steps">
+      <li>Install <a href="https://www.python.org/downloads/">Python 3.12 or 3.13</a> and tick <i>"Add python.exe to PATH"</i>.</li>
+      <li>Install <a href="https://ollama.com/download">Ollama</a> and leave it running.</li>
+      <li>Download CampusMail from <a href="https://github.com/WW-WalterWhite/campusmail">GitHub</a> (<i>Code → Download ZIP</i>) and unzip it.</li>
+      <li>Double-click <code>setup.bat</code>. It installs the dependencies and downloads the model (about 2.5 GB, first time only).</li>
+      <li>Double-click <code>run.bat</code>. Your browser opens CampusMail.</li>
+      <li>Click <b>Load sample inbox</b>, then <b>Sort and summarize</b>. You should see a High deadline and several review items, each with its source.</li>
+    </ol>
+    <p>On macOS or Linux, use <code>./setup.sh</code> and <code>./run.sh</code>. No account, API key or payment is needed.</p>
+  </div>
+</section>
+
+<section>
+  <div class="wrap">
+    <h2>Limits and responsible use</h2>
+    <div class="note"><b>Check the original email before acting.</b> CampusMail can miss or misread messages, and it does not guarantee that every urgent email is found.</div>
+    <ul>
+      <li>It never sends, deletes or changes email, and it never opens links or attachments. Mailbox access is read-only.</li>
+      <li>With the local model, nothing leaves your computer. Nothing is saved or logged, and <b>Clear session</b> forgets everything.</li>
+      <li>English only. Other languages are flagged for review.</li>
+      <li>Development and evaluation use synthetic emails only.</li>
+      <li>AI assistance in building the project is disclosed in the <a href="https://github.com/WW-WalterWhite/campusmail/blob/main/docs/AI_USE_LOG.md">AI use log</a>.</li>
+    </ul>
+  </div>
+</section>
+
+
+<section id="team">
+  <div class="wrap">
+    <h2>Team</h2>
+    <!-- TEAM: replace with your team ID, names and roles. -->
+    <p>Team [team ID]: [Name], [Name], [Name], [Name].</p>
+    <p>We built CampusMail with the help of an AI coding assistant (Claude Code). The
+      <a href="https://github.com/WW-WalterWhite/campusmail/blob/main/docs/AI_USE_LOG.md">AI use log</a> lists what it generated
+      and how we checked it.</p>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap"><a href="https://github.com/WW-WalterWhite/campusmail">Source code on GitHub</a> ·
+    CampusMail is a student project for AILT9019 at the University of Hong Kong. It isn't an official university service.</div>
+</footer>
+</body>
+</html>
