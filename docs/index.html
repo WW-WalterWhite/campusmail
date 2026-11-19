@@ -68,10 +68,6 @@
   .pipeline { display: flex; flex-wrap: wrap; gap: 8px; margin: 14px 0; }
   .pipeline span { background: var(--surface); border: 1px solid var(--line); border-radius: 999px; padding: 4px 12px; font-size: 15px; }
   .note { background: var(--accent-soft); border-left: 4px solid var(--accent); border-radius: 8px; padding: 14px 16px; max-width: 780px; margin: 14px 0; }
-  .video { position: relative; aspect-ratio: 16 / 9; background: var(--surface); border: 1px solid var(--line);
-           border-radius: 10px; overflow: hidden; display: grid; place-items: center; text-align: center; color: var(--muted); padding: 18px; }
-  .video iframe, .video video { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; }
-  .grid2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(290px, 1fr)); gap: 22px; }
   .table-wrap { overflow-x: auto; margin: 14px 0; }
   table { border-collapse: collapse; width: 100%; font-size: 14.5px; background: var(--surface); }
   th, td { border: 1px solid var(--line); padding: 8px 10px; text-align: left; vertical-align: top; }
@@ -98,7 +94,6 @@
       <a class="btn primary" href="#interactive">Try interactive Qwen3 output</a>
       <a class="btn" href="https://github.com/ailt9019-group22/campusmail#quick-start">Install on your laptop</a>
       <a class="btn" href="https://github.com/ailt9019-group22/campusmail">GitHub repository</a>
-      <a class="btn" href="#demo">Watch presentation &amp; demo</a>
     </div>
   </div>
 </header>
@@ -143,25 +138,6 @@
         <figcaption>"Please submit … soon" gives no explicit date, so CampusMail routes it to Needs review and exposes the raw email rather than guessing.</figcaption></figure>
       <figure><img src="screenshots/high_items.png" alt="High priority items with the reason, action, deadline and quoted source sentences" loading="lazy">
         <figcaption>High-priority cards explain the exact policy rule, deadline countdown, summary, and verbatim supporting quotes linked to the source email.</figcaption></figure>
-    </div>
-  </div>
-</section>
-
-<section id="demo">
-  <div class="wrap">
-    <h2>Presentation &amp; Live Demonstration</h2>
-    <p>Recorded on a team laptop running local <code>qwen3:4b</code> through Ollama—no mocked outputs.</p>
-    <div class="grid2">
-      <div>
-        <h3>Live System Demo</h3>
-        <div class="video"><div><b>Live System Demo (Local Qwen3 4B)</b><br><span class="small">Full end-to-end live recording (YouTube Unlisted link provided in submission_links.txt)</span></div></div>
-        <p class="small">End-to-end local Qwen3 4B run, course filtering, manual priority override, <code>.txt/.md/.ics</code> exports, and safe refusal on ambiguous/hostile mail.</p>
-      </div>
-      <div>
-        <h3>3-Minute Oral Presentation (Group 22)</h3>
-        <div class="video"><div><b>3-Minute Team Presentation</b><br><span class="small">3-minute Zoom oral presentation by Group 22 (YouTube Unlisted link provided in submission_links.txt)</span></div></div>
-        <p class="small">Problem motivation, bounded pipeline, quantitative locked-test results, a genuine failure case, and key takeaways.</p>
-      </div>
     </div>
   </div>
 </section>
