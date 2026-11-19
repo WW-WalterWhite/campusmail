@@ -5,9 +5,14 @@ from __future__ import annotations
 import re
 from datetime import datetime
 
-from .dates import FOREIGN_TZ_PATTERN, TIME_PATTERN, _parse_time, find_dates, parse_iso
+from .dates import FOREIGN_TZ_PATTERN, TIME_PATTERN, _parse_time, find_dates, has_vague_timing, parse_iso
 from .importer import normalise_course
 from .models import Extraction, Message
+
+CONFLICT_CUE_PATTERN = re.compile(
+    r"\b(?:correction|corrected|instead of|not on|typo|earlier email|previous email|disagree[ds]?)\b",
+    re.I,
+)
 
 # Phrases that try to steer an AI or ask for mail actions. Their presence never changes the
 # priority by itself; it sends the message to review so a person reads the original.
@@ -68,9 +73,14 @@ def check(extraction: Extraction, message: Message) -> tuple[list[str], datetime
         else:
             extraction.course = code
 
-    if extraction.deadline_status == "vague" and (extraction.action_required or extraction.category == "schedule_change"):
+    if (extraction.action_required or extraction.category == "schedule_change") and (
+        extraction.deadline_status == "vague" or (not extraction.deadline and has_vague_timing(message.text))
+    ):
         reasons.append("Timing is vague (e.g. “soon”); no date was invented.")
-    if extraction.deadline_status == "conflicting":
+    distinct_days = {d.value.date() for d in find_dates(message.text, message.received)} if message.received else set()
+    if extraction.deadline_status == "conflicting" or (
+        CONFLICT_CUE_PATTERN.search(message.text) and len(distinct_days) > 1
+    ):
         reasons.append("The email gives conflicting dates.")
 
     deadline, has_time = None, False
@@ -107,7 +117,13 @@ def check_summary(summary: str, message: Message) -> list[str]:
         if _parse_time(m) not in source_times:
             problems.append(f"The summary mentions the time {m.group(0)!r}, which is not in the email.")
     source_text = message.text
-    for m in NUMBER.finditer(summary):
+    cleaned_summary = re.sub(
+        r"\b(?:UTC|GMT)\s*[+-]\s*0?8(?::00)?\b",
+        lambda m: " " * len(m.group(0)),
+        summary,
+        flags=re.I,
+    )
+    for m in NUMBER.finditer(cleaned_summary):
         if any(m.start() < e and s < m.end() for s, e in taken):
             continue
         if m.group(0).rstrip("%") not in source_text:
@@ -140,10 +156,13 @@ def _verify_deadline(extraction: Extraction, message: Message, reasons: list[str
     if not same_day:
         reasons.append(f"Deadline {claimed:%d %b} does not match the email (“{quote[:60]}”).")
         return None, False
-    match = same_day[0]
+    match = next((d for d in same_day if d.has_time), same_day[0])
     if match.weekday_mismatch:
         reasons.append(f"The weekday and the date in \u201c{match.text}\u201d disagree; check which one is right.")
         return None, False
+    if has_time and claimed.hour == 0 and claimed.minute == 0 and match.has_time:
+        if not re.search(r"\b(?:midnight|00:00|12(?::00)?\s*a\.?m\.?)\b", quote, re.I):
+            claimed, has_time = match.value, True
     if has_time and match.has_time and match.value != claimed:
         reasons.append(f"Deadline time {claimed:%H:%M} does not match the email ({match.value:%H:%M}).")
         return None, False

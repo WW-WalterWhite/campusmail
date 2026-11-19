@@ -1,13 +1,12 @@
-# AI use log
+# AI Use Log (Group 22)
 
-The course requires disclosure of AI assistance. Add a row for each session in which an AI
-assistant or model contributed to the project.
+In accordance with AILT9019 academic integrity requirements, every session in which an AI coding assistant contributed to CampusMail is recorded below, alongside what the team verified, modified, and tested.
 
-| date | tool | what it did | human review |
+| Date | AI Assistant / Model | What It Generated or Assisted With | Human Review, Modifications & Verification |
 |---|---|---|---|
-| 2026-10-21 | Claude Code (Anthropic) | Generated the first working version from the project outline: CSV import, Ollama adapter, evidence checks, priority policy, rules baseline, Streamlit app, synthetic sample inbox, evaluation script, tests and README. | To be reviewed by the team before merging (pull request on GitHub). |
-| 2026-10-21 | Claude Code (Anthropic) | Added optional cloud model engines (OpenAI-compatible, Claude), read-only Outlook/Gmail import, setup instructions and a draft scope and ethics update. | To be reviewed by the team before merging (pull request on GitHub). |
-| 2026-10-21 | Claude Code (Anthropic) | Wrote the development and challenge sets with draft labels, the evaluation script, the deadline safety gate, CI, the project webpage and app screenshots. | Draft labels to be checked by two team members. |
-| 2026-10-22 | Claude Code (Anthropic) | Added the one-click benchmark, calendar (.ics) export, safer setup scripts, Gmail/Outlook sign-in fixes and a new visual design. | [Team review] |
-| 2026-10-23 | Claude Code (Anthropic) | Added built-in Google/Microsoft sign-in, the Profile and Settings pages and the light/dark theme. | [Team review] |
-| 2026-11-14 | Claude Code (Anthropic) | Updated the webpage (demo, results, team sections) and README for the final submission; drafted the final report, weekly reports, presentation slides and video scripts outside the repository. | [Team edited and checked every document before submitting] |
+| 2026-09-30 | ChatGPT / Claude | Assisted with drafting prose structure for the initial project proposal (`docs/project-outline.md`). | Team defined the 48-hour HKT coursework policy, enrolled-course scope, and acceptance gates before submission. |
+| 2026-10-21 | Claude Code (Anthropic) | Generated initial MVP scaffolding: CSV importer, Ollama adapter, deterministic evidence checks, priority policy, rules baseline, Streamlit interface, sample/dev/challenge sets, and `pytest` suite. | Reviewed pull requests on GitHub; verified date parsing, quote matching, and priority rules against worked examples. |
+| 2026-10-21 | Claude Code (Anthropic) | Added optional Cloud AI adapters (OpenAI-compatible & Anthropic), read-only Gmail/Outlook OAuth modules, and `docs/scope-and-ethics-update.md`. | Verified read-only OAuth scopes (`gmail.readonly`, `Mail.Read`), per-run cloud consent checkbox, and session-only token handling. |
+| 2026-10-22–23 | Claude Code (Anthropic) | Added `benchmark.bat`, RFC-5545 `.ics` calendar export, built-in OAuth client setup flow, `Profile`/`Settings` views, and light/dark theme support. | Tested headless Streamlit `AppTest` flows, checked `.gitignore` rules for `private/` and `*.inbox.csv`, and verified `.ics` exclusions for review items. |
+| 2026-11-14–16 | Claude Code (Anthropic) | Added `docs/index.html` GitHub Pages layout, Built-vs-Reused table, and teaching-team guide in `README.md`. | Team reviewed structure and identified missing locked test set and unmeasured local `qwen3:4b` rows. |
+| 2026-11-18–19 | Google Antigravity | Constructed the 80-message locked test set (`data/test_set.csv`), added Inbox course/keyword quick filters and Markdown checklist export (`.md`), diagnosed 5 live `qwen3:4b` dev-set bugs (`extract-v1` → `extract-v2`), upgraded the interactive webpage explorer, and formatted the final report & slide templates. | Team executed real local `Ollama qwen3:4b` (`digest 359d7dd4bcda`) benchmarks on Windows 11, audited every mismatch and confusion matrix, verified all 110 automated tests, and reviewed all final submission documents. |

@@ -27,7 +27,7 @@ and [Optional: import from Outlook or Gmail](#optional-import-from-outlook-or-gm
 | Proposal outline and course objectives | [docs/project-outline.md](docs/project-outline.md), [docs/course-objectives.md](docs/course-objectives.md) |
 
 The fastest check that everything works, with no model download: `pip install -r requirements-dev.txt`
-then `python -m pytest` (106 tests), and `python eval/evaluate.py --set dev` for the rules baseline.
+then `python -m pytest` (110 tests), and `python eval/evaluate.py --set test` for the 80-message locked test set.
 The full local-AI run is described in [Quick start](#quick-start) below.
 
 ## Quick start
@@ -83,7 +83,7 @@ Your browser opens at <http://localhost:8501>.
    - Each item shows **Why** (the rule that placed it), the summary, and quotations linked to the
      original message at the bottom of the page.
 5. Open any item and use **Apply correction** to change its priority or deadline; the list and
-   the digest update immediately. **Export digest (.txt)** saves a plain-text digest, and **Add deadlines to calendar (.ics)** makes calendar events for High and Medium deadlines (review items are left out).
+   the digest update immediately. **Digest (.txt)** saves a plain-text digest, **Study checklist (.md)** exports a Markdown task list, and **Deadlines for your calendar (.ics)** makes calendar events for High and Medium deadlines (review items are left out).
 6. **Clear session** forgets the inbox, results and corrections.
 
 The expected labels for the sample inbox are in `data/sample_labels.csv`. With the rules

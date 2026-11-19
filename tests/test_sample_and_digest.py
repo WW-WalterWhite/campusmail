@@ -4,7 +4,7 @@ import subprocess
 import sys
 
 from campusmail import pipeline
-from campusmail.digest import DISCLAIMER, render_ics, render_text
+from campusmail.digest import DISCLAIMER, render_ics, render_markdown, render_text
 from campusmail.models import Priority
 from campusmail.importer import load_csv, parse_received
 from conftest import ROOT
@@ -50,12 +50,28 @@ def test_deadline_gate_logic():
 
 
 def test_bundled_sets_pass_the_safety_gate(tmp_path):
-    for name in ("sample", "dev", "challenge"):
+    for name in ("sample", "dev", "challenge", "test"):
         out = tmp_path / name
         subprocess.run([sys.executable, str(ROOT / "eval/evaluate.py"), "--set", name, "--out", str(out)],
                        capture_output=True, text=True, check=True)
         report = json.loads(out.with_suffix(".json").read_text())
         assert report["safety_gate"] == "pass", name
+
+
+def test_locked_test_set_has_balanced_80_messages():
+    with (ROOT / "data/test_labels.csv").open(encoding="utf-8") as f:
+        rows = list(csv.DictReader(f))
+    assert len(rows) == 80
+    for band in ("High", "Medium", "Low", "Needs review"):
+        assert sum(1 for r in rows if r["expected_priority"] == band) == 20
+
+
+def test_markdown_checklist_export():
+    run, now = sample_run()
+    md_text = render_markdown(run, now)
+    assert "# CampusMail Action & Priority Checklist" in md_text
+    assert "- [ ] **[m01]** `COMP3297`" in md_text
+    assert DISCLAIMER in md_text
 
 
 def test_calendar_has_only_checked_upcoming_deadlines():

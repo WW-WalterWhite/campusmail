@@ -57,16 +57,22 @@ class Extraction:
 
     @classmethod
     def from_dict(cls, data: dict, source: str = "model") -> "Extraction":
+        def _clean(val) -> str | None:
+            if val is None:
+                return None
+            s = str(val).strip()
+            return None if not s or s.lower() in ("null", "none", "n/a") else s
+
         return cls(
-            course=data.get("course") or None,
+            course=_clean(data.get("course")),
             category=data.get("category") or "other",
             action_required=bool(data.get("action_required")),
-            action_text=data.get("action_text") or None,
-            deadline=data.get("deadline") or None,
+            action_text=_clean(data.get("action_text")),
+            deadline=_clean(data.get("deadline")),
             deadline_status=data.get("deadline_status") or "none",
             summary=(data.get("summary") or "").strip(),
             quotes=[q for q in (data.get("quotes") or []) if isinstance(q, str) and q.strip()],
-            deadline_quote=data.get("deadline_quote") or None,
+            deadline_quote=_clean(data.get("deadline_quote")),
             source=source,
         )
 

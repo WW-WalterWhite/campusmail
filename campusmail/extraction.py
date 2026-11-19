@@ -9,7 +9,7 @@ from .dates import HKT, parse_iso
 from .llm import LLMClient
 from .models import CATEGORIES, DEADLINE_STATUSES, Extraction, Message
 
-PROMPT_VERSION = "extract-v1"
+PROMPT_VERSION = "extract-v2"
 MAX_SUMMARY_WORDS = 60
 
 SCHEMA = {
@@ -43,12 +43,16 @@ Return JSON only, matching the schema. Rules:
 - category: one of {", ".join(CATEGORIES)}. Use schedule_change when a class, lab,
   tutorial or exam is moved, cancelled or rescheduled.
 - action_required: true only if the student must do something (submit, register,
-  sign up, pay, attend a compulsory session, reply). Optional events are false.
+  sign up, pay, attend a compulsory session, reply). Optional events, volunteer calls,
+  "feel free to sign up" or "if you are interested" are false.
 - action_text: the action in at most 15 words, or null.
 - deadline: the explicit due time of the action as ISO 8601 with offset, e.g.
   2026-10-01T17:00:00+08:00. For schedule_change, the time of the changed session.
-  If only a date is given, use the date alone, e.g. 2026-10-01. Use the received time
-  to resolve words like "tomorrow" or "Friday". Never invent a date: if none is
+  If action_required is false and category is not schedule_change, deadline must be null.
+  If only a date is given, use the date alone, e.g. 2026-10-01. "end of day" / "EOD"
+  means 23:59; "noon" means 12:00. Count calendar days carefully forward from the
+  Received date and weekday to resolve "tomorrow" or "this Friday" (e.g. if Received
+  is Tuesday 2026-10-20, "this Friday" is 2026-10-23). Never invent a date: if none is
   written, use null.
 - deadline_status: "explicit" if a specific date is written, "none" if no timing is
   given, "vague" if timing is unclear (e.g. "soon", "next week"), "conflicting" if

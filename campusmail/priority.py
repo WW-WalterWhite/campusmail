@@ -22,6 +22,8 @@ def decide(
     result = Result(message, extraction, Priority.LOW, [], deadline, has_time, review_reasons=list(review_reasons))
     if review_reasons:
         result.priority = Priority.REVIEW
+        result.deadline = None
+        result.deadline_has_time = False
         result.reasons = list(review_reasons)
         return result
     if deadline is not None and not has_time:
@@ -58,6 +60,9 @@ def decide(
             result.reasons.append(f"Action required with no stated deadline{course_note}.")
         return result
 
+    result.deadline = None
+    result.deadline_has_time = False
+    result.assumptions = []
     if enrolled:
         result.priority = Priority.MEDIUM
         result.reasons.append(f"Update for your course {extraction.course}; no action required.")

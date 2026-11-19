@@ -46,6 +46,45 @@ def render_text(run: Run, now: datetime) -> str:
     return "\n".join(lines) + "\n"
 
 
+def render_markdown(run: Run, now: datetime) -> str:
+    """Markdown study checklist with verified quotes and priority bands."""
+    lines = [
+        "# CampusMail Action & Priority Checklist",
+        "",
+        f"- **Reference time:** {now.astimezone(HKT):%a %d %b %Y %H:%M} (UTC+8)",
+        f"- **Processed by:** {run.model_name}" + (" *(rules-only view, no AI summaries)*" if run.mode == MODE_RULES else ""),
+        f"- **Safety note:** {DISCLAIMER}",
+    ]
+    if run.notice:
+        lines += ["", f"> **Notice:** {run.notice}"]
+    for priority, results in run.by_priority().items():
+        if not results:
+            continue
+        lines += ["", f"## {priority.value} ({len(results)})"]
+        for r in results:
+            m, x = r.message, r.extraction
+            course_tag = f"`{x.course}` " if x and x.course else ""
+            flags = (" **[OVERDUE]**" if r.overdue else "") + (" *(corrected by you)*" if r.corrected else "")
+            checkbox = "- [ ] " if (priority in (Priority.HIGH, Priority.MEDIUM) and x and (x.action_required or x.category == "schedule_change")) else "- "
+            lines.append(f"{checkbox}**[{m.message_id}]** {course_tag}{m.subject}{flags}")
+            if x and priority is not Priority.REVIEW:
+                if x.action_text:
+                    lines.append(f"  - **Action:** {x.action_text}")
+                if r.deadline:
+                    lines.append(f"  - **Deadline:** {format_dt(r.deadline, r.deadline_has_time)}")
+                label = "Summary" if x.source == "model" else "Key sentences (rules)"
+                lines.append(f"  - **{label}:** {x.summary}")
+                for q in x.quotes:
+                    lines.append(f"  - *Source [{m.message_id}]:* “{q}”")
+            for reason in r.reasons:
+                lines.append(f"  - **Why:** {reason}")
+            for note in r.notes:
+                lines.append(f"  - **Note:** {note}")
+            for note in r.assumptions:
+                lines.append(f"  - **Assumption:** {note}")
+    return "\n".join(lines) + "\n"
+
+
 def _ics_text(value: str) -> str:
     # RFC 5545 text escaping.
     return value.replace("\\", "\\\\").replace(";", "\\;").replace(",", "\\,").replace("\n", "\\n")

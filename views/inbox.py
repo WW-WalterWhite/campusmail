@@ -13,7 +13,7 @@ import streamlit as st
 
 from campusmail import mailbox, pipeline
 from campusmail.dates import HKT, format_dt
-from campusmail.digest import DISCLAIMER, render_ics, render_text
+from campusmail.digest import DISCLAIMER, render_ics, render_markdown, render_text
 from campusmail.importer import CSVImportError, load_csv, parse_course_list, parse_received
 from campusmail.llm import CLOUD_PROVIDERS, DEFAULT_MODEL, LLMUnavailable, OllamaClient, cloud_client, key_from_env
 from campusmail.models import Priority
@@ -361,27 +361,65 @@ def show_result(result) -> None:
             st.rerun()
 
 
+detected_courses = sorted({r.extraction.course for r in run.results if r.extraction and r.extraction.course})
+f_col1, f_col2, f_col3 = st.columns([2, 2, 1.5])
+search_query = f_col1.text_input("Filter by keyword", key="inbox_search", placeholder="Search subject, summary or body…",
+                                 label_visibility="collapsed")
+course_filter = f_col2.selectbox("Filter by course", ["All courses"] + detected_courses, key="inbox_course_filter",
+                                 label_visibility="collapsed")
+actions_only = f_col3.checkbox("Action / schedule only", key="inbox_actions_only")
+
+
+def matches_filter(result) -> bool:
+    if course_filter != "All courses":
+        if not (result.extraction and result.extraction.course == course_filter):
+            return False
+    if actions_only:
+        if result.priority is not Priority.REVIEW and not (
+            result.extraction and (result.extraction.action_required or result.extraction.category == "schedule_change")
+        ):
+            return False
+    if search_query.strip():
+        q = search_query.strip().lower()
+        hay = " ".join([
+            result.message.message_id,
+            result.message.subject or "",
+            result.message.body or "",
+            result.extraction.summary if result.extraction else "",
+            result.extraction.action_text or "" if result.extraction else "",
+        ]).lower()
+        if q not in hay:
+            return False
+    return True
+
+
 for priority in Priority:
-    if not groups[priority]:
+    visible = [r for r in groups[priority] if matches_filter(r)]
+    if not visible:
         continue
     slug, color, icon, meaning = BAND[priority]
-    st.subheader(f":{color}[:material/{icon}:] {priority.value} :{color}-badge[{len(groups[priority])}]",
+    st.subheader(f":{color}[:material/{icon}:] {priority.value} :{color}-badge[{len(visible)}]",
                  anchor=slug)
-    if priority is Priority.LOW:
-        with st.expander(f"Show {len(groups[priority])} low-priority messages"):
-            for result in groups[priority]:
+    if priority is Priority.LOW and not (search_query.strip() or course_filter != "All courses" or actions_only):
+        with st.expander(f"Show {len(visible)} low-priority messages"):
+            for result in visible:
                 show_result(result)
     else:
-        for result in groups[priority]:
+        for result in visible:
             show_result(result)
 
 st.subheader(":material/download: Export", anchor="export")
-left, right = st.columns(2)
-left.download_button(
+exp_c1, exp_c2, exp_c3 = st.columns(3)
+exp_c1.download_button(
     "Digest (.txt)", render_text(run, now), file_name="campusmail_digest.txt", mime="text/plain",
     icon=":material/description:", width="stretch",
 )
-right.download_button(
+exp_c2.download_button(
+    "Study checklist (.md)", render_markdown(run, now), file_name="campusmail_checklist.md", mime="text/markdown",
+    icon=":material/checklist:", width="stretch",
+    help="Markdown task list with checkboxes, verified quotes and deadlines for Notion, Obsidian or GitHub.",
+)
+exp_c3.download_button(
     "Deadlines for your calendar (.ics)", render_ics(run, now), file_name="campusmail_deadlines.ics",
     mime="text/calendar", icon=":material/event:", width="stretch",
     help="High and Medium items with an upcoming, checked deadline. "

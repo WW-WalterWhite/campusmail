@@ -44,6 +44,7 @@ SETS = {
     "sample": ("data/sample_inbox.csv", "data/sample_labels.csv"),
     "dev": ("data/dev_set.csv", "data/dev_labels.csv"),
     "challenge": ("data/challenge_set.csv", "data/challenge_labels.csv"),
+    "test": ("data/test_set.csv", "data/test_labels.csv"),
 }
 
 

@@ -1,0 +1,337 @@
+{
+  "stamp": "20261119_1746",
+  "sample_ai": {
+    "macro_f1": 1.0,
+    "f1": {
+      "High": 1.0,
+      "Medium": 1.0,
+      "Low": 1.0
+    },
+    "high_rec": 3,
+    "high_tot": 3,
+    "high_pct": 100,
+    "rev_rec": 5,
+    "rev_tot": 5,
+    "rev_pct": 100,
+    "dl_rec": 4,
+    "dl_tot": 4,
+    "dl_pct": 100,
+    "gate": "pass",
+    "median_msg_s": 4.07,
+    "median_run_s": 47.54,
+    "confusion": {
+      "Needs review": {
+        "Needs review": 5,
+        "High": 0,
+        "Medium": 0,
+        "Low": 0
+      },
+      "High": {
+        "Needs review": 0,
+        "High": 3,
+        "Medium": 0,
+        "Low": 0
+      },
+      "Medium": {
+        "Needs review": 0,
+        "High": 0,
+        "Medium": 2,
+        "Low": 0
+      },
+      "Low": {
+        "Needs review": 0,
+        "High": 0,
+        "Medium": 0,
+        "Low": 3
+      }
+    },
+    "mismatches": []
+  },
+  "dev_v1": {
+    "macro_f1": 0.93,
+    "f1": {
+      "High": 0.888888888888889,
+      "Medium": 0.9523809523809523,
+      "Low": 0.9473684210526316
+    },
+    "high_rec": 8,
+    "high_tot": 10,
+    "high_pct": 80,
+    "rev_rec": 7,
+    "rev_tot": 10,
+    "rev_pct": 70,
+    "dl_rec": 15,
+    "dl_tot": 16,
+    "dl_pct": 94,
+    "gate": "FAIL (d26, d32, d39)",
+    "median_msg_s": 3.59,
+    "median_run_s": 141.6,
+    "confusion": {
+      "Needs review": {
+        "Needs review": 7,
+        "High": 0,
+        "Medium": 3,
+        "Low": 0
+      },
+      "High": {
+        "Needs review": 2,
+        "High": 8,
+        "Medium": 0,
+        "Low": 0
+      },
+      "Medium": {
+        "Needs review": 0,
+        "High": 0,
+        "Medium": 10,
+        "Low": 0
+      },
+      "Low": {
+        "Needs review": 0,
+        "High": 0,
+        "Medium": 1,
+        "Low": 9
+      }
+    },
+    "mismatches": [
+      "d02",
+      "d07",
+      "d30",
+      "d32",
+      "d37",
+      "d39"
+    ]
+  },
+  "dev_ai": {
+    "macro_f1": 0.967,
+    "f1": {
+      "High": 0.9473684210526316,
+      "Medium": 0.9523809523809523,
+      "Low": 1.0
+    },
+    "high_rec": 9,
+    "high_tot": 10,
+    "high_pct": 90,
+    "rev_rec": 9,
+    "rev_tot": 10,
+    "rev_pct": 90,
+    "dl_rec": 15,
+    "dl_tot": 16,
+    "dl_pct": 94,
+    "gate": "pass",
+    "median_msg_s": 3.57,
+    "median_run_s": 142.22,
+    "confusion": {
+      "Needs review": {
+        "Needs review": 9,
+        "High": 0,
+        "Medium": 1,
+        "Low": 0
+      },
+      "High": {
+        "Needs review": 0,
+        "High": 9,
+        "Medium": 1,
+        "Low": 0
+      },
+      "Medium": {
+        "Needs review": 0,
+        "High": 0,
+        "Medium": 10,
+        "Low": 0
+      },
+      "Low": {
+        "Needs review": 0,
+        "High": 0,
+        "Medium": 0,
+        "Low": 10
+      }
+    },
+    "mismatches": [
+      "d05",
+      "d31"
+    ]
+  },
+  "challenge_ai": {
+    "macro_f1": 0.952,
+    "f1": {
+      "High": 1.0,
+      "Medium": 0.8571428571428571,
+      "Low": 1.0
+    },
+    "high_rec": 5,
+    "high_tot": 5,
+    "high_pct": 100,
+    "rev_rec": 4,
+    "rev_tot": 4,
+    "rev_pct": 100,
+    "dl_rec": 7,
+    "dl_tot": 8,
+    "dl_pct": 88,
+    "gate": "pass",
+    "median_msg_s": 3.52,
+    "median_run_s": 57.34,
+    "confusion": {
+      "Needs review": {
+        "Needs review": 4,
+        "High": 0,
+        "Medium": 0,
+        "Low": 0
+      },
+      "High": {
+        "Needs review": 0,
+        "High": 5,
+        "Medium": 0,
+        "Low": 0
+      },
+      "Medium": {
+        "Needs review": 1,
+        "High": 0,
+        "Medium": 3,
+        "Low": 0
+      },
+      "Low": {
+        "Needs review": 0,
+        "High": 0,
+        "Medium": 0,
+        "Low": 3
+      }
+    },
+    "mismatches": [
+      "c06"
+    ]
+  },
+  "test_rules": {
+    "macro_f1": 0.966,
+    "f1": {
+      "High": 0.9473684210526316,
+      "Medium": 0.975609756097561,
+      "Low": 0.975609756097561
+    },
+    "high_rec": 18,
+    "high_tot": 20,
+    "high_pct": 90,
+    "rev_rec": 20,
+    "rev_tot": 20,
+    "rev_pct": 100,
+    "dl_rec": 30,
+    "dl_tot": 33,
+    "dl_pct": 91,
+    "gate": "pass",
+    "median_msg_s": 0.0,
+    "median_run_s": 0.02,
+    "confusion": {
+      "Needs review": {
+        "Needs review": 20,
+        "High": 0,
+        "Medium": 0,
+        "Low": 0
+      },
+      "High": {
+        "Needs review": 0,
+        "High": 18,
+        "Medium": 1,
+        "Low": 1
+      },
+      "Medium": {
+        "Needs review": 0,
+        "High": 0,
+        "Medium": 20,
+        "Low": 0
+      },
+      "Low": {
+        "Needs review": 0,
+        "High": 0,
+        "Medium": 0,
+        "Low": 20
+      }
+    },
+    "mismatches": [
+      "t13",
+      "t18"
+    ]
+  },
+  "test_ai": {
+    "macro_f1": 0.974,
+    "f1": {
+      "High": 0.9473684210526316,
+      "Medium": 0.9743589743589743,
+      "Low": 1.0
+    },
+    "high_rec": 18,
+    "high_tot": 20,
+    "high_pct": 90,
+    "rev_rec": 20,
+    "rev_tot": 20,
+    "rev_pct": 100,
+    "dl_rec": 30,
+    "dl_tot": 33,
+    "dl_pct": 91,
+    "gate": "pass",
+    "median_msg_s": 3.66,
+    "median_run_s": 269.27,
+    "confusion": {
+      "Needs review": {
+        "Needs review": 20,
+        "High": 0,
+        "Medium": 0,
+        "Low": 0
+      },
+      "High": {
+        "Needs review": 2,
+        "High": 18,
+        "Medium": 0,
+        "Low": 0
+      },
+      "Medium": {
+        "Needs review": 1,
+        "High": 0,
+        "Medium": 19,
+        "Low": 0
+      },
+      "Low": {
+        "Needs review": 0,
+        "High": 0,
+        "Medium": 0,
+        "Low": 20
+      }
+    },
+    "mismatches": [
+      "t09",
+      "t19",
+      "t30"
+    ]
+  },
+  "hardware": {
+    "os": "Windows-11-10.0.26200-SP0",
+    "python": "3.15.1",
+    "cpu": "Intel64 Family 6 (Windows 11 laptop)"
+  },
+  "failure_case": {
+    "id": "t30",
+    "input": "Subject: \"Library loan renewal reminder\" — Body: \"Please return or renew ' Econometric Analysis ' online by 5 November 2026 to avoid overdue fines.\"",
+    "expected": "Medium",
+    "observed": "Needs review",
+    "why": "Qwen3 4B mistook the borrowed textbook title 'Econometric Analysis' for a university course name in the JSON 'course' field. Because 'Econometric Analysis' is not a valid 4-letter+4-digit course code written in the email, evidence.py rejected the unsupported course field and routed the email safely to Needs review—preventing a false course label without inventing any deadline.",
+    "spoken_summary": "in library reminder t30, Qwen3 4B mistook the textbook title 'Econometric Analysis' for a course code, causing our evidence gate to abstain safely to Needs review rather than Medium."
+  },
+  "test_mismatches": [
+    {
+      "id": "t09",
+      "expected": "High",
+      "predicted": "Needs review",
+      "reason": "Marked as having an explicit deadline but no date was given."
+    },
+    {
+      "id": "t19",
+      "expected": "High",
+      "predicted": "Needs review",
+      "reason": "The summary mentions the time '08:00', which is not in the email. | The summary mentions the number '2026', which is not in the email. | The summary mentions the number '10', which is not in the email."
+    },
+    {
+      "id": "t30",
+      "expected": "Medium",
+      "predicted": "Needs review",
+      "reason": "Course Econometric Analysis is not written in the email."
+    }
+  ]
+}

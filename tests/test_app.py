@@ -31,6 +31,11 @@ def test_rules_run_correction_and_export(app):
     next(b for b in app.button if b.form_id == "fix-m10").click().run()
     assert [m.value for m in app.metric] == ["5", "4", "2", "2"]
     assert any("m10" in md.value and "Corrected by you" in md.value for md in app.markdown)
+    # Test course filter and keyword search without altering top-level band metrics.
+    next(s for s in app.selectbox if s.key == "inbox_course_filter").set_value("COMP3297").run()
+    assert not app.exception
+    assert [m.value for m in app.metric] == ["5", "4", "2", "2"]
+    next(s for s in app.selectbox if s.key == "inbox_course_filter").set_value("All courses").run()
     # Email text is shown literally, never interpreted as Markdown.
     assert not app.exception
 

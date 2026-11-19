@@ -156,6 +156,27 @@ def test_summary_may_restate_time_in_another_format():
     assert r.priority is Priority.HIGH
 
 
+def test_summary_utc8_and_string_null_course_are_accepted():
+    _, r, _ = run_one(LAB, answer(summary="Submit the COMP3297 lab report by 17:00 UTC+8 on 1 October."))
+    assert r.priority is Priority.HIGH
+    plain = "Submit the hall renewal form by 17:00 on 1 October."
+    _, r2, _ = run_one(plain, answer(course="null", quotes=[plain], summary="Submit the hall renewal form by 17:00 on 1 October."))
+    assert r2.priority is Priority.HIGH and r2.extraction.course is None
+
+
+def test_optional_event_does_not_leak_deadline_and_conflicting_dates_go_to_review():
+    fair = "Global Exchange Fair on 1 October at 11:00. No registration needed."
+    _, r_low, _ = run_one(fair, answer(course=None, category="event", action_required=False, action_text=None,
+                                       deadline="2026-10-01T11:00:00+08:00", deadline_quote="1 October at 11:00",
+                                       summary="Global Exchange Fair on 1 October at 11:00.", quotes=[fair]))
+    assert r_low.priority is Priority.LOW and r_low.deadline is None
+
+    conflict = "Correction: COMP3297 report is due 3 October, instead of 1 October as stated in the earlier email."
+    _, r_rev, _ = run_one(conflict, answer(deadline="2026-10-03", deadline_quote="due 3 October",
+                                           summary="COMP3297 report due 3 October.", quotes=[conflict]))
+    assert r_rev.priority is Priority.REVIEW and r_rev.deadline is None
+
+
 def test_model_deadline_with_wrong_weekday_goes_to_review():
     body = "Please submit the COMP3297 lab report by 17:00 on Monday 1 October."  # 1 Oct 2026 is a Thursday
     _, r, _ = run_one(body, answer(quotes=[body], deadline_quote="by 17:00 on Monday 1 October"))

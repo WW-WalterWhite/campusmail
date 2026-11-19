@@ -58,7 +58,7 @@ def main() -> None:
         sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 
     profile = json.loads((ROOT / "data/sample_profile.json").read_text(encoding="utf-8"))
-    sets = ["sample"] if args.quick else ["sample", "dev", "challenge"]
+    sets = ["sample"] if args.quick else ["sample", "dev", "challenge", "test"]
     stamp = datetime.now().strftime("%Y%m%d_%H%M")
 
     client = OllamaClient(model=args.model or DEFAULT_MODEL)
