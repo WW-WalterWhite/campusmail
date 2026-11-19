@@ -179,23 +179,29 @@
     <table>
       <thead><tr><th>Engine</th><th>Test set</th><th>Macro-F1</th><th>High found</th><th>Review flagged</th><th>Safety gate</th><th>Time per email</th></tr></thead>
       <tbody>
-        <!-- RESULTS: add the Qwen3 rows from results/benchmark_<time>.md, and the locked test set if you made one. -->
         <tr><td>Keyword and date rules</td><td>Development, 40 emails (first run)</td><td>0.93</td><td>8 / 10</td><td>8 / 10</td><td>not recorded</td><td>&lt; 0.01 s</td></tr>
+        <tr><td>Qwen3 4B (local)</td><td>Development, 40 emails</td><td>0.91</td><td>7 / 10</td><td>7 / 10</td><td>FAIL (3 emails)</td><td>14.6 s</td></tr>
         <tr><td>Keyword and date rules</td><td>Challenge, 16 emails (first run)</td><td>0.77</td><td>2 / 5</td><td>2 / 4</td><td>not recorded</td><td>&lt; 0.01 s</td></tr>
-        <tr><td>Qwen3 4B (local)</td><td>Development, 40 emails</td><td colspan="5">being measured on a team laptop</td></tr>
+        <tr><td>Qwen3 4B (local)</td><td>Challenge, 16 emails</td><td>0.85</td><td>4 / 5</td><td>2 / 4</td><td>PASS</td><td>16.0 s</td></tr>
       </tbody>
     </table>
     </div>
     <p class="small">The rules rows are the first run on each set, before we fixed the failures it revealed. The rules now score 1.00 on
-      both sets, but only because they were tuned to them, so we don't count that as a result. All 12 scripted fail-safe cases
+      both sets, but only because they were tuned to them, so we don't count that as a result. Qwen3 4B ran through Ollama
+      (prompt extract-v1) on a MacBook Air M2 with 16 GB of memory, macOS 15; times are the median per email. All 12 scripted fail-safe cases
       (prompt injection, ambiguous dates, oversized input, model failure, requests to send or delete mail) pass in the automated tests.
       How to reproduce every number is in <a href="https://github.com/WW-WalterWhite/campusmail/blob/main/docs/EVALUATION.md">EVALUATION.md</a>.</p>
     <h3>When it fails</h3>
     <p>On harder emails it had never seen, the rules found only 2 of 5 urgent emails. For example, it was expected to mark
       "Due: 22 Oct, 11:59 PM" as High, but the date parser did not know that format. Because nothing could be verified, no
       deadline was invented, but a missed High is the worst error for a student. We extended the parser and kept the
-      challenge set as evidence.
-      <!-- FAILURE: add one real Qwen3 failure here: input, expected, observed. --></p>
+      challenge set as evidence.</p>
+    <p>The local model fails differently. One email says "The lab 5 deadline is 26 October, not 24 October". It should go
+      to Needs review because the dates conflict, but Qwen3 did not mark them as conflicting and CampusMail ranked it Medium,
+      due 26 October. On the AI path, spotting a conflict is left to the model, which is why the safety gate failed on
+      3 development emails. Our next fix is to run the rules' conflict check in code on every AI answer. Qwen3 also
+      sometimes adds a number that is not in the email (such as "8"); the evidence check catches it, but 5 emails that
+      needed action ended up in Needs review instead.</p>
 
   </div>
 </section>
@@ -233,8 +239,13 @@
 <section id="team">
   <div class="wrap">
     <h2>Team</h2>
-    <!-- TEAM: replace with your team ID, names and roles. -->
-    <p>Team [team ID]: [Name], [Name], [Name], [Name].</p>
+    <p>Group 22, AILT9019, HKU.</p>
+    <ul>
+      <li><strong>Lang Ho Chan</strong>: Streamlit interface, CSV and mailbox import, exports, webpage</li>
+      <li><strong>Tianjian Huang</strong>: AI extraction, evidence checks, priority policy</li>
+      <li><strong>Jessica Ziyu Qu</strong>: idea and framework, evaluation script and test sets, model runs, demo</li>
+      <li><strong>Siddharth Singh</strong>: fail-safe tests and CI; report, README, ethics, AI-use log</li>
+    </ul>
     <p>We built CampusMail with the help of an AI coding assistant (Claude Code). The
       <a href="https://github.com/WW-WalterWhite/campusmail/blob/main/docs/AI_USE_LOG.md">AI use log</a> lists what it generated
       and how we checked it.</p>
