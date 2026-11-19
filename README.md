@@ -20,7 +20,7 @@ and [Optional: import from Outlook or Gmail](#optional-import-from-outlook-or-gm
 
 | deliverable | where |
 |---|---|
-| Project webpage | [docs/index.html](docs/index.html), published with GitHub Pages at <https://ww-walterwhite.github.io/campusmail/> |
+| Project webpage | [docs/index.html](docs/index.html), published with GitHub Pages at <https://ailt9019-group22.github.io/campusmail/> |
 | Demo video and 3-minute presentation | linked from the webpage's *See it working* section |
 | Evaluation data, method and results | [docs/EVALUATION.md](docs/EVALUATION.md), `data/`, `eval/` |
 | AI-use disclosure | [docs/AI_USE_LOG.md](docs/AI_USE_LOG.md) |

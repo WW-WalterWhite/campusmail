@@ -70,7 +70,7 @@ with st.container(border=True):
     with st.expander("For the developer: add the app's registration (once)", icon=":material/build:",
                      expanded=not google):
         st.markdown("Register CampusMail once with Google (and optionally Microsoft) as described in the "
-                    "[README](https://github.com/WW-WalterWhite/campusmail#optional-import-from-outlook-or-gmail), "
+                    "[README](https://github.com/ailt9019-group22/campusmail#optional-import-from-outlook-or-gmail), "
                     "then add the result here.")
         where = st.radio("Save it", ["Built into this copy of CampusMail", "Only on this computer"], horizontal=True,
                          help="Built in: stored in campusmail/sign_in/, so every copy made from this folder or "
